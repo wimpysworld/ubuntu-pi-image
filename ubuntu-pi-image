@@ -1,0 +1,407 @@
+#!/usr/bin/env bash
+
+# Display help usage
+function usage () {
+  echo
+  echo "Usage"
+  echo "  $0 --flavour <ubuntu flavour> --img ubuntu-20.04-preinstalled-server-arm64+raspi.img.xz"
+  echo
+  echo "Available Ubuntu flavours are"
+  echo "  lubuntu"
+  echo "  kubuntu"
+  echo "  ubuntu"
+  echo "  ubuntu-budgie"
+  echo "  ubuntu-kylin"
+  echo "  ubuntu-mate"
+  echo "  ubuntu-studio"
+  echo "  xubuntu"
+}
+
+function nspawn() {
+    # Create basic resolv.conf for bind mounting inside the container
+    echo "nameserver 1.1.1.1" > "${TMP_DIR}/resolv.conf"
+
+    # Make sure the container has a machine-id
+    systemd-machine-id-setup --root "${R}" --print
+
+    # Bind mount resolv.conf and the firmware, set the hostname and spawn
+    systemd-nspawn \
+      --resolv-conf=off \
+      --bind-ro=${TMP_DIR}/resolv.conf:/etc/resolv.conf \
+      --bind=${B}:/boot/firmware \
+      --hostname="${FLAVOUR}" \
+      -D "${R}" "$@"
+}
+
+function stage_00_tools() {
+    # Required tools on the host
+    apt-get -y install binfmt-support debootstrap \
+    qemu-user-static rsync systemd-container \
+    ubuntu-keyring whois xz-utils
+}
+
+function stage_01_unpack() {
+    # Capture the patition details.
+    BOOT_PARTITION=`fdisk -l "${IMG}" | grep "c W95 FAT32 (LBA)"`
+    ROOT_PARTITION=`fdisk -l "${IMG}" | grep "83 Linux"`
+    echo "${BOOT_PARTITION}"
+    echo "${ROOT_PARTITION}"
+
+    # Grab the starting sector of the partitions.
+    BOOT_START_SECTOR=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
+    ROOT_START_SECTOR=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
+
+    # Calculate the start byte of the partitions.
+    ((BOOT_START_BYTE=${BOOT_START_SECTOR} * 512))
+    ((ROOT_START_BYTE=${ROOT_START_SECTOR} * 512))
+
+    BOOT_SECTOR_LENGTH=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
+    ROOT_SECTOR_LENGTH=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
+
+    # Calculate the byte length of the partitions.
+    ((BOOT_BYTE_LENGTH=${BOOT_SECTOR_LENGTH} * 512))
+    ((ROOT_BYTE_LENGTH=${ROOT_SECTOR_LENGTH} * 512))
+
+    mkdir -p "${TMP_DIR}"/{boot,root}
+    mkdir -p "${B}"
+    mkdir -p "${R}"
+    # Mount the partitions to the mount points.
+    BOOT_MOUNT=$(mount -v -o offset=${BOOT_START_BYTE},sizelimit=${BOOT_BYTE_LENGTH} -t vfat "${IMG}" "${TMP_DIR}/boot")
+    ROOT_MOUNT=$(mount -v -o offset=${ROOT_START_BYTE},sizelimit=${ROOT_BYTE_LENGTH} -t ext4 "${IMG}" "${TMP_DIR}/root")
+    BOOT_DEV=$(echo "${BOOT_MOUNT}" | cut -d' ' -f2)
+    ROOT_DEV=$(echo "${ROOT_MOUNT}" | cut -d' ' -f2)
+    rsync -aHAXx --delete "${TMP_DIR}/boot/" "${B}/"
+    rsync -aHAXx --delete "${TMP_DIR}/root/" "${R}/"
+    umount -l "${TMP_DIR}/boot"
+    umount -l "${TMP_DIR}/root"
+    rm -rf "${TMP_DIR}/boot"
+    rm -rf "${TMP_DIR}/root"
+}
+
+function stage_02_apt() {
+    local OLD_KERNEL_VER="5.4.0-1008"
+    nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu cloud-init cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl ethtool git htop landscape-common lvm2 mdadm multipath-tools openssh-server overlayroot screen sosreport tmux vim xfsprogs
+    nspawn apt-add-repository --yes --no-update ppa:ubuntu-pi-flavour-makers/ppa
+    nspawn apt -y update
+    nspawn apt -y remove linux-image-${OLD_KERNEL_VER}-raspi linux-modules-${OLD_KERNEL_VER}-raspi linux-raspi-headers-${OLD_KERNEL_VER}
+    nspawn apt -y dist-upgrade
+    nspawn apt -y install ${DESKTOP_PACKAGES}^
+    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
+}
+
+function stage_03_snap() {
+    local SEED_CHANNEL="stable/ubuntu-${IMG_VER}"
+    rm -rfv ${R}/var/lib/snapd/seed/*
+    snap known model > "${TMP_DIR}/generic.model"
+    if [ "${FLAVOUR}" == "ubuntu" ]; then
+        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=gnome-3-34-1804=${SEED_CHANNEL} --snap=gtk-common-themes=${SEED_CHANNEL} --snap=snap-store=${SEED_CHANNEL} "${R}"
+    elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
+        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=ubuntu-budgie-welcome=${SEED_CHANNEL} "${R}"
+    elif [ "${FLAVOUR}" == "ubuntu-mate" ]; then
+        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=ubuntu-mate-welcome=${SEED_CHANNEL} --snap=software-boutique=${SEED_CHANNEL} --snap=ubuntu-mate-pi "${R}"
+    fi
+}
+
+function stage_04_config() {
+    echo                            >> ${B}/config.txt
+    echo "disable_overscan=1"       >> ${B}/config.txt
+    echo "dtoverlay=vc4-fkms-v3d"   >> ${B}/config.txt
+    echo "dtparam=audio=on"         >> ${B}/config.txt
+    echo "hdmi_drive=2"             >> ${B}/config.txt
+
+    echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash plymouth.ignore-serial-consoles" > "${B}/cmdline.txt"
+
+    if [ "${FLAVOUR}" == "ubuntu-mate" ]; then
+        cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
+[org.mate.interface]
+enable-animations=false
+
+[org.mate.Marco.general]
+compositing-manager=false
+
+[org.mate.session.required-components]
+windowmanager='marco-no-composite'
+EOM
+
+        # Enable hardware acceleration in Firefox.
+        # Append to Ubuntu MATEs existing Firefox default overrides or create and override for the other flavours
+        if [ -e "${R}/usr/lib/firefox/defaults/pref/all-ubuntumate.js" ] && [ -e "${R}/usr/lib/firefox/ubuntumate.cfg" ]; then
+            echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntumate.cfg"
+        else
+            mkdir -p "${R}/usr/lib/firefox/defaults/pref/" 2>/dev/null
+            echo 'pref("general.config.obscure_value", 0);' > "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
+            echo 'pref("general.config.filename", "ubuntupi.cfg");' >> "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
+            echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntupi.cfg"
+        fi
+    fi
+
+    # Instruct netplan to hand all network management to NetworkManager
+    cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
+# Let NetworkManager manage all devices on this system
+network:
+  version: 2
+  renderer: NetworkManager
+EOM
+
+    # Disable Wifi Powersaving to improve Pi WiFi performance
+    if [ -e "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf" ]; then
+        sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf"
+    fi
+
+    sed -i 's/ENABLED=1/ENABLE=0/' "${R}/etc/default/motd-news"
+
+    local DATE=""
+    DATE=$(date +%m%H%M%S)
+    local PASSWD=""
+    PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
+    nspawn addgroup --gid 29999 oem
+    nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
+    nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
+
+    if [ "${FLAVOUR}" == "kubuntu" ] || [ "${FLAVOUR}" == "lubuntu" ]; then
+        nspawn apt-get -y install --no-install-recommends oem-config-kde ubiquity-frontend-kde ubiquity-ubuntu-artwork
+    else
+        nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
+    fi
+
+    if [ "${FLAVOUR}" == "ubuntu" ]; then
+        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu
+    elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
+        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-budgie
+        # Force the slideshow to use Ubuntu Budgie artwork.
+        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
+        sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
+    elif [ "${FLAVOUR}" == "ubuntu-mate" ]; then
+        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
+        # Force the slideshow to use Ubuntu MATE artwork.
+        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+        sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+    fi
+
+    # Create files/dirs Ubiquity requires
+    mkdir -p ${R}/var/log/installer
+    touch ${R}/var/log/installer/debug
+    touch ${R}/var/log/syslog
+    nspawn chown syslog:adm /var/log/syslog
+
+    nspawn cp -a /usr/lib/oem-config/oem-config.service /lib/systemd/system
+    nspawn cp -a /usr/lib/oem-config/oem-config.target /lib/systemd/system
+    nspawn systemctl enable oem-config.service
+    nspawn systemctl enable oem-config.target
+    nspawn systemctl set-default oem-config.target
+}
+
+function stage_05_clean() {
+    nspawn apt-get -y autoremove
+    nspawn apt-get -y autoclean
+    nspawn apt-get -y clean
+
+    rm -rfv "${R}/etc/cloud"
+    rm -f $R/boot/{*.bak,*.old}
+    rm -f $B/{*.bak,*.old}
+    rm -f $R/etc/apt/*.save
+    rm -f $R/etc/apt/sources.list.d/*.save
+    rm -f $R/var/log/apt/*
+    rm -f $R/var/log/alternatives.log
+    rm -f $R/var/log/dpkg.log
+    rm -f $R/var/log/fontconfig.log
+    rm -rf $R/tmp/*
+    rm -f $R/var/crash/*
+    rm -f $R/var/cache/debconf/*-old
+    rm -f $R/var/lib/dpkg/*-old
+    [ -L $R/var/lib/dbus/machine-id ] || rm -f $R/var/lib/dbus/machine-id
+    echo '' > $R/etc/machine-id
+}
+
+function stage_06_automark() {
+    echo '#!/usr/bin/env bash' > $R/usr/local/bin/automark
+    echo 'for PKG in $(apt-mark showmanual); do apt-mark auto ${PKG}; done' >> $R/usr/local/bin/automark
+    chmod +x $R/usr/local/bin/automark
+    nspawn /usr/local/bin/automark
+    rm -fv $R/usr/local/bin/automark
+}
+
+function stage_07_image() {
+    # Build the image file
+    local SIZE_IMG=$(du -csh "${R}" | tail -n1 | cut -d'.' -f1)
+    ((SIZE_IMG+=2))
+    local SIZE_BOOT="256MiB"
+
+    # Remove old images.
+    rm -fv "${TMP_DIR}/${IMG_OUT}"
+
+    # Create an empty file file.
+    dd if=/dev/zero of="${TMP_DIR}/${IMG_OUT}" bs=1MB count=1
+    dd if=/dev/zero of="${TMP_DIR}/${IMG_OUT}" bs=1MB count=0 seek=$(( ${SIZE_IMG} * 1000 ))
+
+    # Initialising: msdos
+    parted -s ${TMP_DIR}/${IMG_OUT} mktable msdos
+    echo "Creating /boot/firmware partition"
+    parted -a optimal -s ${TMP_DIR}/${IMG_OUT} mkpart primary fat32 1 "${SIZE_BOOT}"
+    echo "Creating / partition"
+    parted -a optimal -s ${TMP_DIR}/${IMG_OUT} mkpart primary ext4 "${SIZE_BOOT}" 100%
+    echo "Making partition 1 bootable"
+    parted -s ${TMP_DIR}/${IMG_OUT} set 1 boot on
+
+    PARTED_OUT=$(parted -s ${TMP_DIR}/${IMG_OUT} unit b print)
+    BOOT_OFFSET=$(echo "${PARTED_OUT}" | grep -e '^ 1'| xargs echo -n \
+    | cut -d" " -f 2 | tr -d B)
+    BOOT_LENGTH=$(echo "${PARTED_OUT}" | grep -e '^ 1'| xargs echo -n \
+    | cut -d" " -f 4 | tr -d B)
+
+    ROOT_OFFSET=$(echo "${PARTED_OUT}" | grep -e '^ 2'| xargs echo -n \
+    | cut -d" " -f 2 | tr -d B)
+    ROOT_LENGTH=$(echo "${PARTED_OUT}" | grep -e '^ 2'| xargs echo -n \
+    | cut -d" " -f 4 | tr -d B)
+
+    BOOT_LOOP=$(losetup --show -f -o ${BOOT_OFFSET} --sizelimit ${BOOT_LENGTH} ${TMP_DIR}/${IMG_OUT})
+    ROOT_LOOP=$(losetup --show -f -o ${ROOT_OFFSET} --sizelimit ${ROOT_LENGTH} ${TMP_DIR}/${IMG_OUT})
+    echo "/boot/firmware: offset ${BOOT_OFFSET}, length ${BOOT_LENGTH}"
+    echo "/:              offset ${ROOT_OFFSET}, length ${ROOT_LENGTH}"
+
+    mkfs.vfat -n system-boot -S 512 -s 16 -v "${BOOT_LOOP}"
+    mkfs.ext4 -L writable -m 0 "${ROOT_LOOP}"
+
+    MOUNTDIR="${TMP_DIR}/image"
+    mkdir -p "${MOUNTDIR}"
+    mount -v "${ROOT_LOOP}" "${MOUNTDIR}" -t ext4
+    mkdir -p "${MOUNTDIR}/boot/firmware"
+    mount -v "${BOOT_LOOP}" "${MOUNTDIR}/boot/firmware" -t vfat
+    echo "Syncing root..."
+    rsync -aHAXx --delete ${R}/ "${MOUNTDIR}/"
+    echo "Syncing boot..."
+    rsync -aHAXx --delete ${B}/ "${MOUNTDIR}/boot/firmware/"
+    date +"%Y%m%d" > "${MOUNTDIR}/.disk/info"
+    sync
+    umount -l "${MOUNTDIR}/boot/firmware"
+    umount -l "${MOUNTDIR}"
+    losetup -d "${ROOT_LOOP}"
+    losetup -d "${BOOT_LOOP}"
+    ls -lh "${TMP_DIR}/${IMG_OUT}"
+    rm -rf "${MOUNTDIR}"
+    echo "Compressing ${IMG_OUT}.xz"
+    rm "${TMP_DIR}/${IMG_OUT}.xz" 2>/dev/null
+    xz -T 0 "${TMP_DIR}/${IMG_OUT}"
+    ls -lh "${TMP_DIR}/${IMG_OUT}.xz"
+}
+
+function stage_08_hash() {
+    local HASH="sha256"
+    local KEY="FFEE1E5C"
+
+    local OUT_HASH="${TMP_DIR}/${IMG_OUT}.xz.${HASH}"
+    local OUT_SIGN="${TMP_DIR}/${IMG_OUT}.xz.${HASH}.sign"
+
+    rm -f "${OUT_HASH}"
+    rm -f "${OUT_SIGN}"
+
+    if [ -e "${TMP_DIR}/${IMG_OUT}.xz" ]; then
+        echo "Hashing ${IMG_OUT}.xz"
+        ${HASH}sum "${TMP_DIR}/${IMG_OUT}.xz" > "${OUT_HASH}"
+        sed -i -r "s/ .*\/(.+)/  \1/g" "${OUT_HASH}"
+        gpg --default-key ${KEY} --armor --output ${OUT_SIGN} --detach-sig ${OUT_HASH}
+    else
+        echo "WARNING! Didn't find ${TMP_DIR}/${IMG_OUT} to hash."
+    fi
+}
+
+if [ $(id -u) -ne 0 ]; then
+    echo "ERROR! Root permissions required."
+    exit 1
+fi
+
+# Take command line arguments
+while [ $# -gt 0 ]; do
+    case "${1}" in
+        -flavour|--flavour|-flavor|--flavor)
+            FLAVOUR="${2}"
+            shift
+            shift;;
+        -img|--img)
+            IMG="${2}"
+            if [ ! -e "${IMG}" ]; then
+                echo "[!] ERROR: ${IMG} was not found."
+                exit 1
+            fi
+            shift
+            shift;;
+        *)
+            echo "[!] ERROR: \"${1}\" is not a supported parameter."
+            usage
+            exit 1;;
+    esac
+done
+
+# Set variables based on chosen desktop environment
+case "${FLAVOUR}" in
+    kubuntu)
+        echo "[+] Specified Kubuntu"
+        DESKTOP_PACKAGES="kubuntu-desktop"
+        shift;;
+    lubuntu)
+        echo "[+] Specified Lubuntu"
+        DESKTOP_PACKAGES="lubuntu-desktop"
+        shift;;
+    ubuntu)
+        echo "[+] Specified Ubuntu"
+        DESKTOP_PACKAGES="ubuntu-desktop"
+        shift;;
+    ubuntu-budgie)
+        echo "[+] Specified Ubuntu Budgie"
+        DESKTOP_PACKAGES="ubuntu-budgie-desktop"
+        shift;;
+    ubuntu-kylin)
+        echo "[+] Specified Ubunty Kylin"
+        DESKTOP_PACKAGES="ubuntukylin-desktop"
+        shift;;
+    ubuntu-mate)
+        echo "[+] Specified Ubuntu MATE"
+        DESKTOP_PACKAGES="ubuntu-mate-desktop"
+        shift;;
+    ubuntu-studio)
+        echo "[+] Specified Ubuntu Studio"
+        DESKTOP_PACKAGES="ubuntustudio-desktop"
+        shift;;
+    xubuntu)
+        echo "[+] Specified Xubuntu"
+        DESKTOP_PACKAGES="xubuntu-desktop"
+        shift;;
+    *)
+        if [ -z "${FLAVOUR}" ]; then
+        echo "[!] ERROR: Please specifiy an Ubuntu flavour"
+        else
+        echo "[!] ERROR: ${FLAVOUR} is not a valid Ubuntu flavour"
+        fi
+        usage
+        exit 1;;
+esac
+
+TMP_DIR="/tmp/pi"
+IMG_QUALITY="-beta1"
+IMG_VER=$(echo "${IMG}" | cut -d'-' -f2)
+IMG_ARCH=$(echo "${IMG}" | cut -d'+' -f1 | cut -d'-' -f5)
+IMG_OUT=$(echo "${IMG}" | sed "s/ubuntu-/${FLAVOUR}-/" | sed 's/preinstalled-server-/desktop-/' | sed "s/${IMG_VER}/${IMG_VER}${IMG_QUALITY}/")
+IMG_TEST=$(file -b "${IMG}" | cut -d';' -f1)
+B="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/boot"
+R="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/root"
+
+if [ "${IMG_TEST}" == "DOS/MBR boot sector" ]; then
+    stage_00_tools
+    stage_01_unpack
+    stage_02_apt
+    stage_03_snap
+    stage_04_config
+    stage_05_clean
+    stage_06_automark
+    stage_07_image
+    stage_08_hash
+else
+    echo "[!] ERROR: ${IMG} is not a valid disk image."
+    if [ "${IMG_TEST}" == "XZ compressed data" ]; then
+        echo "           Try decompressing ${IMG} first using:"
+        echo "           unxz --decompress --keep ${IMG}"
+    fi
+    exit 1
+fi
