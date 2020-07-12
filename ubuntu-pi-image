@@ -222,15 +222,7 @@ function stage_05_clean() {
     echo '' > $R/etc/machine-id
 }
 
-function stage_06_automark() {
-    echo '#!/usr/bin/env bash' > $R/usr/local/bin/automark
-    echo 'for PKG in $(apt-mark showmanual); do apt-mark auto ${PKG}; done' >> $R/usr/local/bin/automark
-    chmod +x $R/usr/local/bin/automark
-    nspawn /usr/local/bin/automark
-    rm -fv $R/usr/local/bin/automark
-}
-
-function stage_07_image() {
+function stage_06_image() {
     # Build the image file
     local SIZE_IMG=$(du -csh "${R}" | tail -n1 | cut -d'.' -f1)
     ((SIZE_IMG+=2))
@@ -294,7 +286,7 @@ function stage_07_image() {
     ls -lh "${TMP_DIR}/${IMG_OUT}.xz"
 }
 
-function stage_08_hash() {
+function stage_07_hash() {
     local HASH="sha256"
     local KEY="FFEE1E5C"
 
@@ -401,9 +393,8 @@ if [ "${IMG_TEST}" == "DOS/MBR boot sector" ]; then
     stage_03_snap
     stage_04_config
     stage_05_clean
-    stage_06_automark
-    stage_07_image
-    stage_08_hash
+    stage_06_image
+    stage_07_hash
 else
     echo "[!] ERROR: ${IMG} is not a valid disk image."
     if [ "${IMG_TEST}" == "XZ compressed data" ]; then
