@@ -95,15 +95,39 @@ function stage_02_apt() {
 
 function stage_03_snap() {
     local SEED_CHANNEL="stable/ubuntu-${IMG_VER}"
-    rm -rfv ${R}/var/lib/snapd/seed/*
-    snap known model > "${TMP_DIR}/generic.model"
+    rm -rf ${R}/var/lib/snapd/seed/*
+    mkdir -p ${R}/var/lib/snapd/seed/{assertions,snaps}
+    snap known --remote model series=16 model=generic-classic brand-id=generic > ${R}/var/lib/snapd/seed/assertions/model
+    local ACCOUNT_KEY=$(grep "^sign-key-sha3-384" ${R}/var/lib/snapd/seed/assertions/model | cut -d':' -f2 | sed 's/ //g')
+    snap known --remote account account-id=generic > ${R}/var/lib/snapd/seed/assertions/account
+    snap known --remote account-key public-key-sha3-384="${ACCOUNT_KEY}" > ${R}/var/lib/snapd/seed/assertions/account-key
+    
     if [ "${FLAVOUR}" == "ubuntu" ]; then
-        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=gnome-3-34-1804=${SEED_CHANNEL} --snap=gtk-common-themes=${SEED_CHANNEL} --snap=snap-store=${SEED_CHANNEL} "${R}"
+        nspawn snap prepare-image --arch "${IMG_ARCH}" --classic /var/lib/snapd/seed/assertions/model --snap=core18 --snap=snapd --snap=gnome-3-34-1804=${SEED_CHANNEL} --snap=gtk-common-themes=${SEED_CHANNEL} --snap=snap-store=${SEED_CHANNEL} /
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} gnome-3-34-1804
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} gtk-common-themes
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} snap-store
     elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
-        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=ubuntu-budgie-welcome=${SEED_CHANNEL} "${R}"
+        nspawn snap prepare-image --arch "${IMG_ARCH}" --classic /var/lib/snapd/seed/assertions/model --snap=core18 --snap=snapd --snap=ubuntu-budgie-welcome=${SEED_CHANNEL} /
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} ubuntu-budgie-welcome
     elif [ "${FLAVOUR}" == "ubuntu-mate" ]; then
-        snap prepare-image --arch "${IMG_ARCH}" --classic "${TMP_DIR}"/generic.model --snap=core18 --snap=ubuntu-mate-welcome=${SEED_CHANNEL} --snap=software-boutique=${SEED_CHANNEL} --snap=ubuntu-mate-pi "${R}"
+        nspawn snap prepare-image --arch "${IMG_ARCH}" --classic /var/lib/snapd/seed/assertions/model --snap=core18 --snap=snapd --snap=ubuntu-mate-welcome=${SEED_CHANNEL} --snap=software-boutique=${SEED_CHANNEL} --snap=ubuntu-mate-pi /
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} ubuntu-mate-welcome
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} software-boutique
+        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps ubuntu-mate-pi
     fi
+    mv -v ${R}/var/lib/snapd/seed/snaps/*.assert ${R}/var/lib/snapd/seed/assertions/
+    rm -f ${R}/var/lib/snapd/seed/assertions/generic.account
+    rm -f ${R}/var/lib/snapd/seed/assertions/*.account
+    rm -f ${R}/var/lib/snapd/seed/assertions/*.account-key
+    rm -f ${R}/var/lib/snapd/seed/assertions/*.snap-declaration
+    rm -f ${R}/var/lib/snapd/seed/assertions/*.snap-revision
 }
 
 function stage_04_config() {
