@@ -13,6 +13,7 @@ function usage () {
   echo "  ubuntu-budgie"
   echo "  ubuntu-kylin"
   echo "  ubuntu-mate"
+  echo "  ubuntu-mate-minimal"
   echo "  ubuntu-studio"
   echo "  xubuntu"
 }
@@ -194,7 +195,7 @@ EOM
 
     echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash plymouth.ignore-serial-consoles" > "${B}/cmdline.txt"
 
-    if [ "${FLAVOUR}" == "ubuntu-mate" ]; then
+    if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
         cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
 [org.mate.interface]
 enable-animations=false
@@ -257,7 +258,7 @@ EOM
         sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
         sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
         sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
-    elif [ "${FLAVOUR}" == "ubuntu-mate" ]; then
+    elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
         nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
         # Force the slideshow to use Ubuntu MATE artwork.
         sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
@@ -435,6 +436,10 @@ case "${FLAVOUR}" in
     ubuntu-mate)
         echo "[+] Specified Ubuntu MATE"
         DESKTOP_PACKAGES="ubuntu-mate-desktop"
+        shift;;
+    ubuntu-mate-minimal)
+        echo "[+] Specified Ubuntu MATE (minimal)"
+        DESKTOP_PACKAGES="ubuntu-mate-core"
         shift;;
     ubuntu-studio)
         echo "[+] Specified Ubuntu Studio"
