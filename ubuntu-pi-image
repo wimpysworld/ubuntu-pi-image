@@ -107,6 +107,51 @@ function stage_03_snap() {
 }
 
 function stage_04_config() {
+    cat <<'EOM' > ${R}/etc/cloud/cloud.cfg
+# The top level settings are used as module
+# and system configuration.
+
+# The modules that run in the 'init' stage
+cloud_init_modules:
+ - seed_random
+ - bootcmd
+ - write-files
+ - growpart
+ - resizefs
+ - mounts
+
+# The modules that run in the 'config' stage
+cloud_config_modules:
+# Emit the cloud config ready event
+# this can be used by upstart jobs for 'start on cloud-config'.
+ - emit_upstart
+ - runcmd
+
+# The modules that run in the 'final' stage
+cloud_final_modules:
+ - scripts-vendor
+ - scripts-per-once
+ - scripts-per-boot
+ - scripts-per-instance
+ - scripts-user
+ - final-message
+
+# System and/or distro specific settings
+# (not accessible to handlers/transforms)
+system_info:
+   # This will affect which distro class gets used
+   distro: ubuntu
+   network:
+     renderers: ['netplan', 'eni', 'sysconfig']
+   # Automatically discover the best ntp_client
+   ntp_client: auto
+   # Other config here will be given to the distro class and/or path classes
+   paths:
+      cloud_dir: /var/lib/cloud/
+      templates_dir: /etc/cloud/templates/
+      upstart_dir: /etc/init/
+EOM
+
     echo                            >> ${B}/config.txt
     echo "disable_overscan=1"       >> ${B}/config.txt
     echo "dtoverlay=vc4-fkms-v3d"   >> ${B}/config.txt
@@ -205,7 +250,6 @@ function stage_05_clean() {
     nspawn apt-get -y autoclean
     nspawn apt-get -y clean
 
-    rm -rfv "${R}/etc/cloud"
     rm -f $R/boot/{*.bak,*.old}
     rm -f $B/{*.bak,*.old}
     rm -f $R/etc/apt/*.save
