@@ -80,17 +80,26 @@ function stage_01_unpack() {
 
 function stage_02_apt() {
     local OLD_KERNEL_VER="5.4.0-1008"
+    nspawn apt -y remove linux-image-${OLD_KERNEL_VER}-raspi linux-modules-${OLD_KERNEL_VER}-raspi linux-raspi-headers-${OLD_KERNEL_VER}
     nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
     cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
     eatmydata ethtool finalrd git htop landscape-common lvm2 \
     lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
     overlayroot screen sosreport tmux vim xfsprogs
+
+    wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
+    wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
+    wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
+    wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb
+    ls -l ${R}/usr/local/share/
+    nspawn apt-get -y install /usr/local/share/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb
+    rm -f ${R}/usr/local/share/*.deb
+
     nspawn apt-add-repository --yes --no-update ppa:ubuntu-pi-flavour-makers/ppa
     nspawn apt -y update
-    nspawn apt -y remove linux-image-${OLD_KERNEL_VER}-raspi linux-modules-${OLD_KERNEL_VER}-raspi linux-raspi-headers-${OLD_KERNEL_VER}
-    nspawn apt -y dist-upgrade
     nspawn apt -y install ${DESKTOP_PACKAGES}^
     nspawn apt -y install libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
+    nspawn apt -y dist-upgrade
 }
 
 function stage_03_snap() {
