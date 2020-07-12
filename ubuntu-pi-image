@@ -80,7 +80,11 @@ function stage_01_unpack() {
 
 function stage_02_apt() {
     local OLD_KERNEL_VER="5.4.0-1008"
-    nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu cloud-init cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl ethtool git htop landscape-common lvm2 mdadm multipath-tools openssh-server overlayroot screen sosreport tmux vim xfsprogs
+    nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
+    cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
+    eatmydata ethtool finalrd git htop landscape-common lvm2 \
+    lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
+    overlayroot screen sosreport tmux vim xfsprogs
     nspawn apt-add-repository --yes --no-update ppa:ubuntu-pi-flavour-makers/ppa
     nspawn apt -y update
     nspawn apt -y remove linux-image-${OLD_KERNEL_VER}-raspi linux-modules-${OLD_KERNEL_VER}-raspi linux-raspi-headers-${OLD_KERNEL_VER}
