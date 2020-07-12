@@ -124,6 +124,8 @@ compositing-manager=false
 windowmanager='marco-no-composite'
 EOM
 
+        nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
+
         # Enable hardware acceleration in Firefox.
         # Append to Ubuntu MATEs existing Firefox default overrides or create and override for the other flavours
         if [ -e "${R}/usr/lib/firefox/defaults/pref/all-ubuntumate.js" ] && [ -e "${R}/usr/lib/firefox/ubuntumate.cfg" ]; then
