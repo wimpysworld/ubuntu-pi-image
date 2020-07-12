@@ -458,7 +458,7 @@ case "${FLAVOUR}" in
         exit 1;;
 esac
 
-TMP_DIR="/tmp/pi"
+TMP_DIR=$(pwd)
 IMG_QUALITY="-beta1"
 IMG_VER=$(echo "${IMG}" | cut -d'-' -f2)
 IMG_ARCH=$(echo "${IMG}" | cut -d'+' -f1 | cut -d'-' -f5)
