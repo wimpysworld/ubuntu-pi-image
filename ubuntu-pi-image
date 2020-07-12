@@ -86,7 +86,7 @@ function stage_02_apt() {
     nspawn apt -y remove linux-image-${OLD_KERNEL_VER}-raspi linux-modules-${OLD_KERNEL_VER}-raspi linux-raspi-headers-${OLD_KERNEL_VER}
     nspawn apt -y dist-upgrade
     nspawn apt -y install ${DESKTOP_PACKAGES}^
-    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
+    nspawn apt -y install libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
 }
 
 function stage_03_snap() {
