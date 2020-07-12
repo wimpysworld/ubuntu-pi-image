@@ -1,0 +1,7 @@
+resolv.conf
+*.img
+*.img.xz
+*.img.xz.sha256
+*.img.xz.sha256.sign
+arm64/
+armhf/
