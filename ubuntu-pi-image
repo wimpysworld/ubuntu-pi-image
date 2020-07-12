@@ -92,7 +92,6 @@ function stage_02_apt() {
     wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
     wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
     wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb
-    ls -l ${R}/usr/local/share/
     nspawn apt-get -y install /usr/local/share/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-modules-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb /usr/local/share/linux-raspi-headers-5.4.0-1015_5.4.0-1015.15_${IMG_ARCH}.deb
     rm -f ${R}/usr/local/share/*.deb
 
