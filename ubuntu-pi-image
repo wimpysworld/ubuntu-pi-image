@@ -132,14 +132,14 @@ EOM
 
         # Enable hardware acceleration in Firefox.
         # Append to Ubuntu MATEs existing Firefox default overrides or create and override for the other flavours
-        if [ -e "${R}/usr/lib/firefox/defaults/pref/all-ubuntumate.js" ] && [ -e "${R}/usr/lib/firefox/ubuntumate.cfg" ]; then
-            echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntumate.cfg"
-        else
-            mkdir -p "${R}/usr/lib/firefox/defaults/pref/" 2>/dev/null
-            echo 'pref("general.config.obscure_value", 0);' > "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
-            echo 'pref("general.config.filename", "ubuntupi.cfg");' >> "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
-            echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntupi.cfg"
-        fi
+        #if [ -e "${R}/usr/lib/firefox/defaults/pref/all-ubuntumate.js" ] && [ -e "${R}/usr/lib/firefox/ubuntumate.cfg" ]; then
+        #    echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntumate.cfg"
+        #else
+        #    mkdir -p "${R}/usr/lib/firefox/defaults/pref/" 2>/dev/null
+        #    echo 'pref("general.config.obscure_value", 0);' > "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
+        #    echo 'pref("general.config.filename", "ubuntupi.cfg");' >> "${R}/usr/lib/firefox/defaults/pref/all-ubuntupi.js"
+        #    echo 'defaultPref("layers.acceleration.force-enabled", true);' >> "${R}/usr/lib/firefox/ubuntupi.cfg"
+        #fi
     fi
 
     # Instruct netplan to hand all network management to NetworkManager
