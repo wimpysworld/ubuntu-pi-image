@@ -85,7 +85,7 @@ function stage_02_apt() {
     cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
     eatmydata ethtool finalrd git htop landscape-common lvm2 \
     lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
-    overlayroot screen sosreport tmux vim xfsprogs
+    openssh-sftp-server overlayroot screen sosreport tmux vim xfsprogs
 
     wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-headers-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
     wget -c https://launchpad.net/ubuntu/+archive/primary/+files/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb -O ${R}/usr/local/share/linux-image-5.4.0-1015-raspi_5.4.0-1015.15_${IMG_ARCH}.deb
