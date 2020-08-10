@@ -218,62 +218,62 @@ EOM
         nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
     fi
 
-    # Instruct netplan to hand all network management to NetworkManager
-    cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
+# Instruct netplan to hand all network management to NetworkManager
+cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
 # Let NetworkManager manage all devices on this system
 network:
   version: 2
   renderer: NetworkManager
 EOM
 
-    # Disable Wifi Powersaving to improve Pi WiFi performance
-    if [ -e "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf" ]; then
-        sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf"
-    fi
+# Disable Wifi Powersaving to improve Pi WiFi performance
+if [ -e "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf" ]; then
+    sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf"
+fi
 
-    sed -i 's/ENABLED=1/ENABLE=0/' "${R}/etc/default/motd-news"
+sed -i 's/ENABLED=1/ENABLE=0/' "${R}/etc/default/motd-news"
 
-    local DATE=""
-    DATE=$(date +%m%H%M%S)
-    local PASSWD=""
-    PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
-    nspawn addgroup --gid 29999 oem
-    nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
-    nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
+local DATE=""
+DATE=$(date +%m%H%M%S)
+local PASSWD=""
+PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
+nspawn addgroup --gid 29999 oem
+nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
+nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
 
-    if [ "${FLAVOUR}" == "kubuntu" ] || [ "${FLAVOUR}" == "lubuntu" ]; then
-        nspawn apt-get -y install --no-install-recommends oem-config-kde ubiquity-frontend-kde ubiquity-ubuntu-artwork
-    else
-        nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
-    fi
+if [ "${FLAVOUR}" == "kubuntu" ] || [ "${FLAVOUR}" == "lubuntu" ]; then
+    nspawn apt-get -y install --no-install-recommends oem-config-kde ubiquity-frontend-kde ubiquity-ubuntu-artwork
+else
+    nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
+fi
 
-    if [ "${FLAVOUR}" == "ubuntu" ]; then
-        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu
-    elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
-        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-budgie
-        # Force the slideshow to use Ubuntu Budgie artwork.
-        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
-        sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
-    elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
-        nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
-        # Force the slideshow to use Ubuntu MATE artwork.
-        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-        sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-        sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-    fi
+if [ "${FLAVOUR}" == "ubuntu" ]; then
+    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu
+elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
+    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-budgie
+    # Force the slideshow to use Ubuntu Budgie artwork.
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
+    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
+elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
+    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
+    # Force the slideshow to use Ubuntu MATE artwork.
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+fi
 
-    # Create files/dirs Ubiquity requires
-    mkdir -p ${R}/var/log/installer
-    touch ${R}/var/log/installer/debug
-    touch ${R}/var/log/syslog
-    nspawn chown syslog:adm /var/log/syslog
+# Create files/dirs Ubiquity requires
+mkdir -p ${R}/var/log/installer
+touch ${R}/var/log/installer/debug
+touch ${R}/var/log/syslog
+nspawn chown syslog:adm /var/log/syslog
 
-    nspawn cp -a /usr/lib/oem-config/oem-config.service /lib/systemd/system
-    nspawn cp -a /usr/lib/oem-config/oem-config.target /lib/systemd/system
-    nspawn systemctl enable oem-config.service
-    nspawn systemctl enable oem-config.target
-    nspawn systemctl set-default oem-config.target
+nspawn cp -a /usr/lib/oem-config/oem-config.service /lib/systemd/system
+nspawn cp -a /usr/lib/oem-config/oem-config.target /lib/systemd/system
+nspawn systemctl enable oem-config.service
+nspawn systemctl enable oem-config.target
+nspawn systemctl set-default oem-config.target
 }
 
 function stage_05_clean() {
