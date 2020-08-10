@@ -142,6 +142,11 @@ function stage_03_snap() {
 }
 
 function stage_04_config() {
+    rm ${B}/network-config
+
+    # Disable cloud-init from managing the network
+    echo "network: {config: disabled}" > ${R}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+
     cat <<'EOM' > ${R}/etc/cloud/cloud.cfg
 # The top level settings are used as module
 # and system configuration.
