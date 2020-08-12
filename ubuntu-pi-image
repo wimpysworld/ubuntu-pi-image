@@ -34,6 +34,9 @@ function nspawn() {
       --hostname="${FLAVOUR}" \
       --machine="${FLAVOUR}" \
       -D "${R}" "$@"
+    
+    # Clean up
+    rm "${TMP_DIR}/resolv.conf"
 }
 
 function stage_00_tools() {
