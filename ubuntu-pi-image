@@ -111,6 +111,19 @@ function stage_02_apt() {
     nspawn apt -y install ${DESKTOP_PACKAGES}^
     nspawn apt -y install libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
     nspawn apt -y dist-upgrade
+    wget "https://addons.mozilla.org/firefox/downloads/file/3398929/h264ify-1.1.0.xpi" -O /tmp/h264ify.xpi
+    mkdir /tmp/moz
+    cd /tmp/moz
+    bsdtar -xf /tmp/h264ify.xpi
+    sed -i 's/\[ "storage" \]/\[ "storage" \],     \
+      "browser_specific_settings": {               \
+        "gecko": {                                 \
+          "id": "jid1-TSgSxBhncsPBWQ@jetpack"      \
+        }                                          \
+      }/' manifest.json
+      bsdtar -caf h264ify.zip *
+    install -Dm644 h264ify.zip "${R}/usr/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}/jid1-TSgSxBhncsPBWQ@jetpack.xpi"
+    rm -rf /tmp/moz
 }
 
 function stage_03_snap() {
