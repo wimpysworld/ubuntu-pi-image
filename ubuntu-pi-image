@@ -114,7 +114,8 @@ function stage_02_apt() {
 }
 
 function stage_03_snap() {
-    local SEED_CHANNEL="stable/ubuntu-${IMG_VER}"
+    local REL_VER=$(echo ${IMG_VER} | cut -d'.' -f1-2)
+    local SEED_CHANNEL="stable/ubuntu-${REL_VER}"
     rm -rf ${R}/var/lib/snapd/seed/*
     mkdir -p ${R}/var/lib/snapd/seed/{assertions,snaps}
     snap known --remote model series=16 model=generic-classic brand-id=generic > ${R}/var/lib/snapd/seed/assertions/model
