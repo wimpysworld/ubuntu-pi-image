@@ -32,9 +32,8 @@ function nspawn() {
       --bind-ro=${TMP_DIR}/resolv.conf:/etc/resolv.conf \
       --bind=${B}:/boot/firmware \
       --hostname="${FLAVOUR}" \
-      --machine="${FLAVOUR}" \
+      --machine="${FLAVOUR}-${IMG_ARCH}" \
       -D "${R}" "$@"
-    
     # Clean up
     rm "${TMP_DIR}/resolv.conf"
 }
