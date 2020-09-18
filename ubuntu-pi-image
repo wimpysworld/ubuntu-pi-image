@@ -135,7 +135,7 @@ function stage_03_snap() {
     local ACCOUNT_KEY=$(grep "^sign-key-sha3-384" ${R}/var/lib/snapd/seed/assertions/model | cut -d':' -f2 | sed 's/ //g')
     snap known --remote account account-id=generic > ${R}/var/lib/snapd/seed/assertions/account
     snap known --remote account-key public-key-sha3-384="${ACCOUNT_KEY}" > ${R}/var/lib/snapd/seed/assertions/account-key
-    
+
     if [ "${FLAVOUR}" == "ubuntu" ]; then
         nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
         nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
