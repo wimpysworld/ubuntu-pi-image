@@ -212,10 +212,11 @@ system_info:
       upstart_dir: /etc/init/
 EOM
 
-    echo                            >> ${B}/config.txt
-    echo "disable_overscan=1"       >> ${B}/config.txt
-    echo "dtoverlay=vc4-fkms-v3d"   >> ${B}/config.txt
-    echo "hdmi_drive=2"             >> ${B}/config.txt
+echo                            >> ${B}/config.txt
+echo "disable_overscan=1"       >> ${B}/config.txt
+echo "dtoverlay=vc4-fkms-v3d"   >> ${B}/config.txt
+echo "gpu_mem=128"              >> ${B}/config.txt
+echo "hdmi_drive=2"             >> ${B}/config.txt
 
 echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
 
