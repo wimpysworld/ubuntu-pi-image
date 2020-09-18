@@ -242,10 +242,11 @@ network:
   renderer: NetworkManager
 EOM
 
-# Disable Wifi Powersaving to improve Pi WiFi performance
-if [ -e "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf" ]; then
-    sed -i 's/wifi.powersave = 3/wifi.powersave = 2/' "${R}/etc/NetworkManager/conf.d/default-wifi-powersave-on.conf"
-fi
+# Disable Wifi power saving to improve WiFi performance on the Pi
+cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
+[connection]
+wifi.powersave = 2
+EOM
 
 sed -i 's/ENABLED=1/ENABLE=0/' "${R}/etc/default/motd-news"
 
