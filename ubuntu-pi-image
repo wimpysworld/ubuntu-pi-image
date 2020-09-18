@@ -220,20 +220,6 @@ echo "hdmi_drive=2"             >> ${B}/config.txt
 
 echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
 
-    if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
-        cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
-[org.mate.interface]
-enable-animations=false
-
-[org.mate.Marco.general]
-compositing-manager=false
-
-[org.mate.session.required-components]
-windowmanager='marco-no-composite'
-EOM
-        nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
-    fi
-
 # Instruct netplan to hand all network management to NetworkManager
 cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
 # Let NetworkManager manage all devices on this system
@@ -291,6 +277,19 @@ nspawn cp -a /usr/lib/oem-config/oem-config.target /lib/systemd/system
 nspawn systemctl enable oem-config.service
 nspawn systemctl enable oem-config.target
 nspawn systemctl set-default oem-config.target
+if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
+    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
+[org.mate.interface]
+enable-animations=false
+
+[org.mate.Marco.general]
+compositing-manager=false
+
+[org.mate.session.required-components]
+windowmanager='marco-no-composite'
+EOM
+    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
+fi
 }
 
 function stage_05_clean() {
