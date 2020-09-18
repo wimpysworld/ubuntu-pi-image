@@ -267,16 +267,16 @@ elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal
 fi
 
 # Create files/dirs Ubiquity requires
-mkdir -p ${R}/var/log/installer
-touch ${R}/var/log/installer/debug
-touch ${R}/var/log/syslog
+mkdir -p "${R}/var/log/installer"
+touch "${R}/var/log/installer/debug"
+touch "${R}/var/log/syslog"
 nspawn chown syslog:adm /var/log/syslog
 
-nspawn cp -a /usr/lib/oem-config/oem-config.service /lib/systemd/system
-nspawn cp -a /usr/lib/oem-config/oem-config.target /lib/systemd/system
-nspawn systemctl enable oem-config.service
-nspawn systemctl enable oem-config.target
-nspawn systemctl set-default oem-config.target
+touch "${R}/var/lib/oem-config/run"
+nspawn /usr/sbin/oem-config-prepare --quiet
+
+
+
 if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
     cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
 [org.mate.interface]
