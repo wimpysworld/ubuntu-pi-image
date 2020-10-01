@@ -5,7 +5,7 @@ LC_ALL=C
 function usage () {
   echo
   echo "Usage"
-  echo "  $0 --flavour <ubuntu flavour> --img ubuntu-20.04-preinstalled-server-arm64+raspi.img.xz"
+  echo "  $0 --flavour <ubuntu flavour> --img ubuntu-20.04.1-preinstalled-server-arm64+raspi.img"
   echo
   echo "Available Ubuntu flavours are"
   echo "  lubuntu"
