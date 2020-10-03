@@ -227,14 +227,11 @@ fi
 
 # Create files/dirs Ubiquity requires
 mkdir -p "${R}/var/log/installer"
+touch "${R}/var/lib/oem-config/run"
 touch "${R}/var/log/installer/debug"
 touch "${R}/var/log/syslog"
 nspawn chown syslog:adm /var/log/syslog
-
-touch "${R}/var/lib/oem-config/run"
 nspawn /usr/sbin/oem-config-prepare --quiet
-
-
 
 if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
     cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
