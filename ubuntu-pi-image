@@ -102,7 +102,7 @@ function stage_02_apt() {
     nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
 
     # Copy new devicetree, overlays and kernel to /boot/firmware
-    local NEW_KERNEL=$(ls -1 ${IMG_ARCH}/${FLAVOUR}/root/boot/vmlinuz-* | head -n 1 | cut -d'-' -f2-4)
+    local NEW_KERNEL=$(ls -1 ${IMG_ARCH}/${FLAVOUR}/root/boot/vmlinuz-* | head -n 1 | cut -d'/' -f5 | cut -d'-' -f2-4)
     echo ${NEW_KERNEL}
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/*.dtb ${B}/
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/broadcom/*.dtb ${B}/
