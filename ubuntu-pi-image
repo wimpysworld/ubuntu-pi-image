@@ -195,8 +195,6 @@ cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
 wifi.powersave = 2
 EOM
 
-sed -i 's/ENABLED=1/ENABLE=0/' "${R}/etc/default/motd-news"
-
 local DATE=""
 DATE=$(date +%m%H%M%S)
 local PASSWD=""
