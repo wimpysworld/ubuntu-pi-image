@@ -246,6 +246,24 @@ windowmanager='marco-no-composite'
 EOM
     nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 fi
+
+# Create Raspberry Pi specific groups.
+nspawn groupadd -f --system gpio
+nspawn groupadd -f --system i2c
+nspawn groupadd -f --system input
+nspawn groupadd -f --system spi
+
+cat <<'EOM' > "${R}/usr/local/sbin/adduser.local"
+#!/bin/sh
+# This script is executed as the final step when calling `adduser`
+# USAGE:
+#   adduser.local USER UID GID HOME
+
+# Add user to the Raspberry Pi specific groups
+usermod -a -G adm,gpio,i2c,input,spi,video $1
+EOM
+chmod 755 "${R}/usr/local/sbin/adduser.local"
+
 cat <<'EOM' > "${R}/etc/fstab"
 LABEL=writable      /               ext4    defaults,noatime,x-systemd.growfs   0   0
 LABEL=system-boot   /boot/firmware  vfat    defaults                            0   1
