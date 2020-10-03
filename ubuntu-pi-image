@@ -90,7 +90,7 @@ function stage_02_apt() {
 
     # Remove most of the server components
     nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
-    cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
+    cloud-init cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
     eatmydata ethtool finalrd git htop landscape-common lvm2 \
     lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
     openssh-sftp-server overlayroot screen sosreport tmux vim xfsprogs
@@ -106,10 +106,10 @@ function stage_02_apt() {
     cp -v ${R}/boot/vmlinuz-${NEW_KERNEL} ${B}/vmlinuz
     cp -v ${R}/boot/initrd.img-${NEW_KERNEL} ${B}/initrd.img
 
-    nspawn apt-add-repository --yes --no-update ppa:ubuntu-pi-flavour-makers/ppa
+    nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
     nspawn apt -y update
     nspawn apt -y install ${DESKTOP_PACKAGES}^
-    nspawn apt -y install libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
+    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
     nspawn apt -y dist-upgrade
     wget "https://addons.mozilla.org/firefox/downloads/file/3398929/h264ify-1.1.0.xpi" -O /tmp/h264ify.xpi
     mkdir /tmp/moz
@@ -165,52 +165,20 @@ function stage_03_snap() {
 }
 
 function stage_04_config() {
-    rm ${B}/network-config
+# Instruct netplan to hand all network management to NetworkManager
+    cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
+# Let NetworkManager manage all devices on this system
+network:
+  version: 2
+  renderer: NetworkManager
+EOM
 
     # Disable cloud-init from managing the network
     echo "network: {config: disabled}" > ${R}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
 
-    cat <<'EOM' > ${R}/etc/cloud/cloud.cfg
-# The top level settings are used as module
-# and system configuration.
-
-# The modules that run in the 'init' stage
-cloud_init_modules:
- - seed_random
- - bootcmd
- - write-files
- - growpart
- - resizefs
- - mounts
-
-# The modules that run in the 'config' stage
-cloud_config_modules:
- - runcmd
-
-# The modules that run in the 'final' stage
-cloud_final_modules:
- - scripts-vendor
- - scripts-per-once
- - scripts-per-boot
- - scripts-per-instance
- - scripts-user
- - final-message
-
-# System and/or distro specific settings
-# (not accessible to handlers/transforms)
-system_info:
-   # This will affect which distro class gets used
-   distro: ubuntu
-   network:
-     renderers: ['netplan', 'eni', 'sysconfig']
-   # Automatically discover the best ntp_client
-   ntp_client: auto
-   # Other config here will be given to the distro class and/or path classes
-   paths:
-      cloud_dir: /var/lib/cloud/
-      templates_dir: /etc/cloud/templates/
-      upstart_dir: /etc/init/
-EOM
+# Disable the serial UART
+sed -i 's/enable_uart=1/enable_uart=0/' "${B}/syscfg.txt"
+sed -i 's/enable_uart=1/enable_uart=0/' "${B}/config.txt"
 
 echo                            >> ${B}/config.txt
 echo "disable_overscan=1"       >> ${B}/config.txt
@@ -219,14 +187,6 @@ echo "gpu_mem=128"              >> ${B}/config.txt
 echo "hdmi_drive=2"             >> ${B}/config.txt
 
 echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
-
-# Instruct netplan to hand all network management to NetworkManager
-cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
-# Let NetworkManager manage all devices on this system
-network:
-  version: 2
-  renderer: NetworkManager
-EOM
 
 # Disable Wifi power saving to improve WiFi performance on the Pi
 cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
@@ -311,6 +271,9 @@ function stage_05_clean() {
     rm -f $R/var/lib/dpkg/*-old
     [ -L $R/var/lib/dbus/machine-id ] || rm -f $R/var/lib/dbus/machine-id
     echo '' > $R/etc/machine-id
+    rm -f "${B}/meta-data"
+    rm -f "${B}/network-config"
+    rm -f "${B}/user-data"
 }
 
 function stage_06_image() {
