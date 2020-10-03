@@ -102,6 +102,7 @@ function stage_02_apt() {
     # Copy new devicetree, overlays and kernel to /boot/firmware
     local NEW_KERNEL=$(ls -1 ${IMG_ARCH}/${FLAVOUR}/root/boot/vmlinuz-* | head -n 1 | cut -d'-' -f2-4)
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/*.dtb ${B}/
+    cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/broadcom/*.dtb ${B}/
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/overlays/* ${B}/overlays/
     cp -v ${R}/boot/vmlinuz-${NEW_KERNEL} ${B}/vmlinuz
     cp -v ${R}/boot/initrd.img-${NEW_KERNEL} ${B}/initrd.img
