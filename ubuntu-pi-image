@@ -87,6 +87,8 @@ function stage_02_apt() {
     # Remove old kernel
     local OLD_KERNEL=$(ls -1 ${R}/lib/modules/ | head -n1)
     local OLD_KERNEL_SHORT=$(echo ${OLD_KERNEL} | sed s'/-raspi//')
+    echo ${OLD_KERNEL}
+    echo ${OLD_KERNEL_SHORT}
 
     # Remove most of the server components
     nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
@@ -101,6 +103,7 @@ function stage_02_apt() {
 
     # Copy new devicetree, overlays and kernel to /boot/firmware
     local NEW_KERNEL=$(ls -1 ${IMG_ARCH}/${FLAVOUR}/root/boot/vmlinuz-* | head -n 1 | cut -d'-' -f2-4)
+    echo ${NEW_KERNEL}
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/*.dtb ${B}/
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/broadcom/*.dtb ${B}/
     cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/overlays/* ${B}/overlays/
