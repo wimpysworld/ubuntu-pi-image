@@ -96,11 +96,9 @@ function stage_01_unpack() {
 }
 
 function stage_02_apt() {
-    # Remove old kernel
-    local OLD_KERNEL=$(ls -1 ${R}/lib/modules/ | head -n1)
-    local OLD_KERNEL_SHORT=$(echo ${OLD_KERNEL} | sed s'/-raspi//')
-    echo ${OLD_KERNEL}
-    echo ${OLD_KERNEL_SHORT}
+    export B="${B_STAGE_2}"
+    export R="${R_STAGE_2}"
+    sync_from "${B_STAGE_1}" "${R_STAGE_1}"
 
     # Remove most of the server components
     nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
@@ -110,18 +108,6 @@ function stage_02_apt() {
     openssh-sftp-server overlayroot screen sosreport tmux vim xfsprogs
 
     if [ "${REL_VER}" == "20.04" ]; then
-    nspawn apt -y dist-upgrade
-    nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
-
-    # Copy new devicetree, overlays and kernel to /boot/firmware
-    local NEW_KERNEL=$(ls -1 ${IMG_ARCH}/${FLAVOUR}/root/boot/vmlinuz-* | head -n 1 | cut -d'/' -f5 | cut -d'-' -f2-4)
-    echo ${NEW_KERNEL}
-    cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/*.dtb ${B}/
-    cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/broadcom/*.dtb ${B}/
-    cp -v ${R}/lib/firmware/${NEW_KERNEL}/device-tree/overlays/* ${B}/overlays/
-    cp -v ${R}/boot/vmlinuz-${NEW_KERNEL} ${B}/vmlinuz
-    cp -v ${R}/boot/initrd.img-${NEW_KERNEL} ${B}/initrd.img
-
         nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
     fi
     nspawn apt -y update
@@ -297,6 +283,26 @@ function stage_05_clean() {
     nspawn apt-get -y autoremove
     nspawn apt-get -y autoclean
     nspawn apt-get -y clean
+
+    # Remove old kernel
+    local OLD_KERNEL=$(ls -1 ${R}/lib/modules/ | head -n1)
+    local OLD_KERNEL_SHORT=$(echo ${OLD_KERNEL} | sed s'/-raspi//')
+    local NEW_KERNEL=$(ls -1 ${R_STAGE_4}/boot/vmlinuz-* | tail -n1 | awk -F/ '{print $NF}' | cut -d'-' -f2-4)
+    echo "Old: ${OLD_KERNEL} (${OLD_KERNEL_SHORT})"
+    echo "New: ${NEW_KERNEL}"
+    if [ "${OLD_KERNEL}" == "${NEW_KERNEL}" ]; then
+        echo "No old kernel to remove."
+    else
+        nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
+    fi
+
+    # Copy new devicetree, overlays and kernel to /boot/firmware
+    cp ${R}/lib/firmware/${NEW_KERNEL}/device-tree/*.dtb ${B}/
+    cp ${R}/lib/firmware/${NEW_KERNEL}/device-tree/broadcom/*.dtb ${B}/
+    cp ${R}/lib/firmware/${NEW_KERNEL}/device-tree/overlays/* ${B}/overlays/
+    cp -av ${R}/boot/vmlinuz-${NEW_KERNEL} ${B}/vmlinuz
+    cp -av ${R}/boot/initrd.img-${NEW_KERNEL} ${B}/initrd.img
+
     rm -f $R/etc/ssh/ssh_host_*_key*
     rm -f $R/boot/{*.bak,*.old}
     rm -f $B/{*.bak,*.old}
