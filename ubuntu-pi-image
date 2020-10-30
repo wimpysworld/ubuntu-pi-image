@@ -43,13 +43,11 @@ function nspawn() {
     # Bind mount resolv.conf and the firmware, set the hostname and spawn
     systemd-nspawn \
       --resolv-conf=off \
-      --bind-ro=${TMP_DIR}/resolv.conf:/etc/resolv.conf \
+      --bind-ro=${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/resolv.conf:/etc/resolv.conf \
       --bind=${B}:/boot/firmware \
       --hostname="${FLAVOUR}" \
-      --machine="${FLAVOUR}-${IMG_ARCH}" \
-      -D "${R}" "$@"
-    # Clean up
-    rm "${TMP_DIR}/resolv.conf"
+      --machine="${IMG_ARCH}-${FLAVOUR}-${REL_VER}" \
+      --directory "${R}" "$@"
 }
 
 function stage_00_tools() {
