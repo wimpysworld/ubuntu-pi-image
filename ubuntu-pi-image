@@ -109,7 +109,7 @@ function stage_02_apt() {
     lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
     openssh-sftp-server overlayroot screen sosreport tmux vim xfsprogs
 
-    nspawn apt -y update
+    if [ "${REL_VER}" == "20.04" ]; then
     nspawn apt -y dist-upgrade
     nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
 
@@ -122,8 +122,10 @@ function stage_02_apt() {
     cp -v ${R}/boot/vmlinuz-${NEW_KERNEL} ${B}/vmlinuz
     cp -v ${R}/boot/initrd.img-${NEW_KERNEL} ${B}/initrd.img
 
-    nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
+        nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
+    fi
     nspawn apt -y update
+    nspawn apt -y dist-upgrade
     nspawn apt -y install ${DESKTOP_PACKAGES}^
     nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
     nspawn apt -y dist-upgrade
