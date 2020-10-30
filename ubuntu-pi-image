@@ -8,15 +8,9 @@ function usage () {
   echo "  $0 --flavour <ubuntu flavour> --img ubuntu-20.04.1-preinstalled-server-arm64+raspi.img"
   echo
   echo "Available Ubuntu flavours are"
-  echo "  lubuntu"
-  echo "  kubuntu"
   echo "  ubuntu"
-  echo "  ubuntu-budgie"
-  echo "  ubuntu-kylin"
   echo "  ubuntu-mate"
   echo "  ubuntu-mate-minimal"
-  echo "  ubuntu-studio"
-  echo "  xubuntu"
 }
 
 function nspawn() {
@@ -205,21 +199,10 @@ PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
 nspawn addgroup --gid 29999 oem
 nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
 nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
-
-if [ "${FLAVOUR}" == "kubuntu" ] || [ "${FLAVOUR}" == "lubuntu" ]; then
-    nspawn apt-get -y install --no-install-recommends oem-config-kde ubiquity-frontend-kde ubiquity-ubuntu-artwork
-else
-    nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
-fi
+nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
 
 if [ "${FLAVOUR}" == "ubuntu" ]; then
     nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu
-elif [ "${FLAVOUR}" == "ubuntu-budgie" ]; then
-    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-budgie
-    # Force the slideshow to use Ubuntu Budgie artwork.
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
-    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-budgie/' $R/usr/sbin/oem-config-remove-gtk
 elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
     nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
     # Force the slideshow to use Ubuntu MATE artwork.
@@ -415,25 +398,9 @@ fi
 
 # Set variables based on chosen desktop environment
 case "${FLAVOUR}" in
-    kubuntu)
-        echo "[+] Specified Kubuntu"
-        DESKTOP_PACKAGES="kubuntu-desktop"
-        shift;;
-    lubuntu)
-        echo "[+] Specified Lubuntu"
-        DESKTOP_PACKAGES="lubuntu-desktop"
-        shift;;
     ubuntu)
         echo "[+] Specified Ubuntu"
         DESKTOP_PACKAGES="ubuntu-desktop"
-        shift;;
-    ubuntu-budgie)
-        echo "[+] Specified Ubuntu Budgie"
-        DESKTOP_PACKAGES="ubuntu-budgie-desktop"
-        shift;;
-    ubuntu-kylin)
-        echo "[+] Specified Ubunty Kylin"
-        DESKTOP_PACKAGES="ubuntukylin-desktop"
         shift;;
     ubuntu-mate)
         echo "[+] Specified Ubuntu MATE"
@@ -442,14 +409,6 @@ case "${FLAVOUR}" in
     ubuntu-mate-minimal)
         echo "[+] Specified Ubuntu MATE (minimal)"
         DESKTOP_PACKAGES="ubuntu-mate-core"
-        shift;;
-    ubuntu-studio)
-        echo "[+] Specified Ubuntu Studio"
-        DESKTOP_PACKAGES="ubuntustudio-desktop"
-        shift;;
-    xubuntu)
-        echo "[+] Specified Xubuntu"
-        DESKTOP_PACKAGES="xubuntu-desktop"
         shift;;
     *)
         if [ -z "${FLAVOUR}" ]; then
