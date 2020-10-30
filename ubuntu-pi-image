@@ -58,6 +58,9 @@ function stage_00_tools() {
 }
 
 function stage_01_unpack() {
+    export B="${B_STAGE_1}"
+    export R="${R_STAGE_1}"
+
     # Capture the patition details.
     BOOT_PARTITION=`fdisk -l "${IMG}" | grep "c W95 FAT32 (LBA)"`
     ROOT_PARTITION=`fdisk -l "${IMG}" | grep "83 Linux"`
@@ -85,20 +88,16 @@ function stage_01_unpack() {
     #echo "${BOOT_BYTE_LENGTH}"
     #echo "${ROOT_BYTE_LENGTH}"
 
-    mkdir -p "${TMP_DIR}"/{boot,root}
-    mkdir -p "${B}"
-    mkdir -p "${R}"
     # Mount the partitions to the mount points.
-    BOOT_MOUNT=$(mount -v -o offset=${BOOT_START_BYTE},sizelimit=${BOOT_BYTE_LENGTH} -t vfat "${IMG}" "${TMP_DIR}/boot")
-    ROOT_MOUNT=$(mount -v -o offset=${ROOT_START_BYTE},sizelimit=${ROOT_BYTE_LENGTH} -t ext4 "${IMG}" "${TMP_DIR}/root")
+    BOOT_MOUNT=$(mount -v -o offset=${BOOT_START_BYTE},sizelimit=${BOOT_BYTE_LENGTH} -t vfat "${IMG}" "${B_STAGE_0}")
+    ROOT_MOUNT=$(mount -v -o offset=${ROOT_START_BYTE},sizelimit=${ROOT_BYTE_LENGTH} -t ext4 "${IMG}" "${R_STAGE_0}")
     BOOT_DEV=$(echo "${BOOT_MOUNT}" | cut -d' ' -f2)
     ROOT_DEV=$(echo "${ROOT_MOUNT}" | cut -d' ' -f2)
-    rsync -aHAXx --delete "${TMP_DIR}/boot/" "${B}/"
-    rsync -aHAXx --delete "${TMP_DIR}/root/" "${R}/"
-    umount -l "${TMP_DIR}/boot"
-    umount -l "${TMP_DIR}/root"
-    rm -rf "${TMP_DIR}/boot"
-    rm -rf "${TMP_DIR}/root"
+    sync_from "${B_STAGE_0}" "${R_STAGE_0}"
+    umount -l "${B_STAGE_0}"
+    umount -l "${R_STAGE_0}"
+    rm -rf "${B_STAGE_0}"
+    rm -rf "${R_STAGE_0}"
 }
 
 function stage_02_apt() {
@@ -137,7 +136,10 @@ function stage_02_apt() {
 }
 
 function stage_03_snap() {
-    local REL_VER=$(echo ${IMG_VER} | cut -d'.' -f1-2)
+    export B="${B_STAGE_3}"
+    export R="${R_STAGE_3}"
+    sync_from "${B_STAGE_2}" "${R_STAGE_2}"
+
     local SEED_CHANNEL="stable/ubuntu-${REL_VER}"
 
     # Remove existing seeded snaps.
@@ -192,6 +194,10 @@ function stage_03_snap() {
 }
 
 function stage_04_config() {
+    export B="${B_STAGE_4}"
+    export R="${R_STAGE_4}"
+    sync_from "${B_STAGE_3}" "${R_STAGE_3}"
+
 # Instruct netplan to hand all network management to NetworkManager
     cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
 # Let NetworkManager manage all devices on this system
@@ -286,6 +292,13 @@ EOM
 }
 
 function stage_05_clean() {
+    export B="${B_STAGE_5}"
+    export R="${R_STAGE_5}"
+    sync_from "${B_STAGE_4}" "${R_STAGE_4}"
+
+    nspawn apt-get -y update
+    nspawn apt-get -y upgrade
+    nspawn apt-get -y dist-upgrade
     nspawn apt-get -y autoremove
     nspawn apt-get -y autoclean
     nspawn apt-get -y clean
@@ -330,28 +343,31 @@ function stage_05_clean() {
 }
 
 function stage_06_image() {
+    export B="${B_STAGE_5}"
+    export R="${R_STAGE_5}"
+
     # Build the image file
     local SIZE_IMG=$(du -csh "${R}" | tail -n1 | cut -d'.' -f1)
     ((SIZE_IMG+=2))
     local SIZE_BOOT="256MiB"
 
     # Remove old images.
-    rm -fv "${TMP_DIR}/${IMG_OUT}"
+    rm -fv "${IMG_DIR}/${IMG_OUT}"
 
     # Create an empty file file.
-    dd if=/dev/zero of="${TMP_DIR}/${IMG_OUT}" bs=1MB count=1
-    dd if=/dev/zero of="${TMP_DIR}/${IMG_OUT}" bs=1MB count=0 seek=$(( ${SIZE_IMG} * 1000 ))
+    dd if=/dev/zero of="${IMG_DIR}/${IMG_OUT}" bs=1MB count=1
+    dd if=/dev/zero of="${IMG_DIR}/${IMG_OUT}" bs=1MB count=0 seek=$(( ${SIZE_IMG} * 1000 ))
 
     # Initialising: msdos
-    parted -s ${TMP_DIR}/${IMG_OUT} mktable msdos
+    parted -s ${IMG_DIR}/${IMG_OUT} mktable msdos
     echo "Creating /boot/firmware partition"
-    parted -a optimal -s ${TMP_DIR}/${IMG_OUT} mkpart primary fat32 1 "${SIZE_BOOT}"
+    parted -a optimal -s ${IMG_DIR}/${IMG_OUT} mkpart primary fat32 1 "${SIZE_BOOT}"
     echo "Creating / partition"
-    parted -a optimal -s ${TMP_DIR}/${IMG_OUT} mkpart primary ext4 "${SIZE_BOOT}" 100%
+    parted -a optimal -s ${IMG_DIR}/${IMG_OUT} mkpart primary ext4 "${SIZE_BOOT}" 100%
     echo "Making partition 1 bootable"
-    parted -s ${TMP_DIR}/${IMG_OUT} set 1 boot on
+    parted -s ${IMG_DIR}/${IMG_OUT} set 1 boot on
 
-    PARTED_OUT=$(parted -s ${TMP_DIR}/${IMG_OUT} unit b print)
+    PARTED_OUT=$(parted -s ${IMG_DIR}/${IMG_OUT} unit b print)
     BOOT_OFFSET=$(echo "${PARTED_OUT}" | grep -e '^ 1'| xargs echo -n \
     | cut -d" " -f 2 | tr -d B)
     BOOT_LENGTH=$(echo "${PARTED_OUT}" | grep -e '^ 1'| xargs echo -n \
@@ -362,54 +378,54 @@ function stage_06_image() {
     ROOT_LENGTH=$(echo "${PARTED_OUT}" | grep -e '^ 2'| xargs echo -n \
     | cut -d" " -f 4 | tr -d B)
 
-    BOOT_LOOP=$(losetup --show -f -o ${BOOT_OFFSET} --sizelimit ${BOOT_LENGTH} ${TMP_DIR}/${IMG_OUT})
-    ROOT_LOOP=$(losetup --show -f -o ${ROOT_OFFSET} --sizelimit ${ROOT_LENGTH} ${TMP_DIR}/${IMG_OUT})
+    BOOT_LOOP=$(losetup --show -f -o ${BOOT_OFFSET} --sizelimit ${BOOT_LENGTH} ${IMG_DIR}/${IMG_OUT})
+    ROOT_LOOP=$(losetup --show -f -o ${ROOT_OFFSET} --sizelimit ${ROOT_LENGTH} ${IMG_DIR}/${IMG_OUT})
     echo "/boot/firmware: offset ${BOOT_OFFSET}, length ${BOOT_LENGTH}"
     echo "/:              offset ${ROOT_OFFSET}, length ${ROOT_LENGTH}"
 
     mkfs.vfat -n system-boot -S 512 -s 16 -v "${BOOT_LOOP}"
     mkfs.ext4 -L writable -m 0 "${ROOT_LOOP}"
 
-    MOUNTDIR="${TMP_DIR}/image"
-    mkdir -p "${MOUNTDIR}"
-    mount -v "${ROOT_LOOP}" "${MOUNTDIR}" -t ext4
-    mkdir -p "${MOUNTDIR}/boot/firmware"
-    mount -v "${BOOT_LOOP}" "${MOUNTDIR}/boot/firmware" -t vfat
+    mount -v "${ROOT_LOOP}" "${LOOP_DIR}" -t ext4
+    mkdir -p "${LOOP_DIR}/boot/firmware"
+    mount -v "${BOOT_LOOP}" "${LOOP_DIR}/boot/firmware" -t vfat
     echo "Syncing root..."
-    rsync -aHAXx --delete ${R}/ "${MOUNTDIR}/"
+    rsync -aHAXx --delete ${R}/ "${LOOP_DIR}/"
     echo "Syncing boot..."
-    rsync -aHAXx --delete ${B}/ "${MOUNTDIR}/boot/firmware/"
-    date +"%Y%m%d" > "${MOUNTDIR}/.disk/info"
+    rsync -aHAXx --delete ${B}/ "${LOOP_DIR}/boot/firmware/"
+    date +"%Y%m%d" > "${LOOP_DIR}/.disk/info"
     sync
-    umount -l "${MOUNTDIR}/boot/firmware"
-    umount -l "${MOUNTDIR}"
+    umount -l "${LOOP_DIR}/boot/firmware"
+    umount -l "${LOOP_DIR}"
     losetup -d "${ROOT_LOOP}"
     losetup -d "${BOOT_LOOP}"
-    ls -lh "${TMP_DIR}/${IMG_OUT}"
-    rm -rf "${MOUNTDIR}"
+    ls -lh "${IMG_DIR}/${IMG_OUT}"
     echo "Compressing ${IMG_OUT}.xz"
-    rm "${TMP_DIR}/${IMG_OUT}.xz" 2>/dev/null
-    xz --keep -T 0 "${TMP_DIR}/${IMG_OUT}"
-    ls -lh "${TMP_DIR}/${IMG_OUT}.xz"
+    rm "${IMG_DIR}/${IMG_OUT}.xz" 2>/dev/null
+    xz --keep -T 0 "${IMG_DIR}/${IMG_OUT}"
+    ls -lh "${IMG_DIR}/${IMG_OUT}.xz"
 }
 
 function stage_07_hash() {
+    export B="${B_STAGE_5}"
+    export R="${R_STAGE_5}"
+
     local HASH="sha256"
     local KEY="FFEE1E5C"
 
-    local OUT_HASH="${TMP_DIR}/${IMG_OUT}.xz.${HASH}"
-    local OUT_SIGN="${TMP_DIR}/${IMG_OUT}.xz.${HASH}.sign"
+    local OUT_HASH="${IMG_DIR}/${IMG_OUT}.xz.${HASH}"
+    local OUT_SIGN="${IMG_DIR}/${IMG_OUT}.xz.${HASH}.sign"
 
     rm -f "${OUT_HASH}"
     rm -f "${OUT_SIGN}"
 
-    if [ -e "${TMP_DIR}/${IMG_OUT}.xz" ]; then
+    if [ -e "${IMG_DIR}/${IMG_OUT}.xz" ]; then
         echo "Hashing ${IMG_OUT}.xz"
-        ${HASH}sum "${TMP_DIR}/${IMG_OUT}.xz" > "${OUT_HASH}"
+        ${HASH}sum "${IMG_DIR}/${IMG_OUT}.xz" > "${OUT_HASH}"
         sed -i -r "s/ .*\/(.+)/  \1/g" "${OUT_HASH}"
         gpg --default-key ${KEY} --armor --output ${OUT_SIGN} --detach-sig ${OUT_HASH}
     else
-        echo "WARNING! Didn't find ${TMP_DIR}/${IMG_OUT} to hash."
+        echo "WARNING! Didn't find ${IMG_DIR}/${IMG_OUT} to hash."
     fi
 }
 
@@ -469,14 +485,31 @@ case "${FLAVOUR}" in
         exit 1;;
 esac
 
-TMP_DIR=$(pwd)
-IMG_QUALITY="-beta2"
+TMP_DIR="/var/cache/ubuntu-pi-image"
+IMG_DIR=$(pwd)
+IMG_QUALITY="-beta3"
+IMG_QUALITY=""
 IMG_VER=$(echo "${IMG}" | cut -d'-' -f2)
+REL_VER=$(echo ${IMG_VER} | cut -d'.' -f1-2)
 IMG_ARCH=$(echo "${IMG}" | cut -d'+' -f1 | cut -d'-' -f5)
 IMG_OUT=$(echo "${IMG}" | sed "s/ubuntu-/${FLAVOUR}-/" | sed 's/preinstalled-server-/desktop-/' | sed "s/${IMG_VER}/${IMG_VER}${IMG_QUALITY}/")
 IMG_TEST=$(file -b "${IMG}" | cut -d';' -f1)
-B="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/boot"
-R="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/root"
+B_STAGE_0="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_0"
+R_STAGE_0="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_0"
+B_STAGE_1="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_1"
+R_STAGE_1="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_1"
+B_STAGE_2="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_2"
+R_STAGE_2="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_2"
+B_STAGE_3="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_3"
+R_STAGE_3="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_3"
+B_STAGE_4="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_4"
+R_STAGE_4="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_4"
+B_STAGE_5="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_5"
+R_STAGE_5="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_5"
+LOOP_DIR="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/loop"
+for STAGE in ${B_STAGE_0} ${R_STAGE_0} ${B_STAGE_1} ${R_STAGE_1} ${B_STAGE_2} ${R_STAGE_2} ${B_STAGE_3} ${R_STAGE_3} ${B_STAGE_4} ${R_STAGE_4} ${B_STAGE_5} ${R_STAGE_5} ${LOOP_DIR}; do
+    mkdir -p "${STAGE}" 2>/dev/null
+done
 
 if [ "${IMG_TEST}" == "DOS/MBR boot sector" ]; then
     stage_00_tools
