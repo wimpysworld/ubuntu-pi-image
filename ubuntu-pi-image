@@ -13,9 +13,29 @@ function usage () {
   echo "  ubuntu-mate-minimal"
 }
 
+function sync_from() {
+    if [ -z "${1}" ] || [ -z "${2}" ]; then
+        echo "ERROR! Source stages to sync were not passed."
+        exit 1
+    fi
+
+    local B_SOURCE="${1}"
+    local R_SOURCE="${2}"
+
+    if [ -d "${B}" ] && [ -d "${R}" ]; then
+        echo "Syncing from ${B_SOURCE}..."
+        rsync -aHAXx --delete "${B_SOURCE}/" "${B}/"
+        echo "Syncing from ${R_SOURCE}..."
+        rsync -aHAXx --delete "${R_SOURCE}/" "${R}/"
+    else
+        echo "ERROR! Either ${B} or ${R} do not exist!"
+        exit 1
+    fi
+}
+
 function nspawn() {
     # Create basic resolv.conf for bind mounting inside the container
-    echo "nameserver 1.1.1.1" > "${TMP_DIR}/resolv.conf"
+    echo "nameserver 1.1.1.1" > "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/resolv.conf"
 
     # Make sure the container has a machine-id
     systemd-machine-id-setup --root "${R}" --print
