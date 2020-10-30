@@ -377,6 +377,9 @@ touch "${R}/var/log/syslog"
 nspawn chown syslog:adm /var/log/syslog
 nspawn /usr/sbin/oem-config-prepare --quiet
 
+# Install seeded snaps during oem-setup
+nspawn ln -s /lib/systemd/system/snapd.seeded.service /etc/systemd/system/oem-config.target.wants/snapd.seeded.service
+
 if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
     cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
 [org.mate.interface]
