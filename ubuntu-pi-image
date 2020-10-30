@@ -67,10 +67,14 @@ function stage_01_unpack() {
     # Grab the starting sector of the partitions.
     BOOT_START_SECTOR=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
     ROOT_START_SECTOR=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
+    #echo "${BOOT_START_SECTOR}"
+    #echo "${ROOT_START_SECTOR}"
 
     # Calculate the start byte of the partitions.
     ((BOOT_START_BYTE=${BOOT_START_SECTOR} * 512))
     ((ROOT_START_BYTE=${ROOT_START_SECTOR} * 512))
+    #echo "${BOOT_START_BYTE}"
+    #echo "${ROOT_START_BYTE}"
 
     BOOT_SECTOR_LENGTH=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
     ROOT_SECTOR_LENGTH=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
@@ -78,6 +82,8 @@ function stage_01_unpack() {
     # Calculate the byte length of the partitions.
     ((BOOT_BYTE_LENGTH=${BOOT_SECTOR_LENGTH} * 512))
     ((ROOT_BYTE_LENGTH=${ROOT_SECTOR_LENGTH} * 512))
+    #echo "${BOOT_BYTE_LENGTH}"
+    #echo "${ROOT_BYTE_LENGTH}"
 
     mkdir -p "${TMP_DIR}"/{boot,root}
     mkdir -p "${B}"
