@@ -206,18 +206,141 @@ network:
   renderer: NetworkManager
 EOM
 
-    # Disable cloud-init from managing the network
-    echo "network: {config: disabled}" > ${R}/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+if [ "${REL_VER}"  == "20.04" ]; then
+    cat <<EOM > "${B}/README"
+An overview of the files on the /boot/firmware partition (the 1st partition
+on the SD card) used by the Ubuntu boot process (roughly in order) is as
+follows:
 
-# Disable the serial UART
-sed -i 's/enable_uart=1/enable_uart=0/' "${B}/syscfg.txt"
-sed -i 's/enable_uart=1/enable_uart=0/' "${B}/config.txt"
+* bootcode.bin   - this is the second stage bootloader loaded by all pis with
+                   the exception of the pi4 (where this is replaced by flash
+                   memory)
+* config.txt     - the first configuration file read by the boot process
+* syscfg.txt     - the file in which system modified configuration will be
+                   placed, included by config.txt
+* usercfg.txt    - the file in which user modified configuration should be
+                   placed, included by config.txt
+* start*.elf     - the third stage bootloader, which handles device-tree
+                   modification and which loads...
+* uboot*.bin     - various u-boot binaries for different pi platforms; these
+                   are launched as the "kernel" by config.txt
+* boot.scr       - the boot script executed by uboot*.bin which in turn
+                   loads...
+* vmlinuz        - the Linux kernel, executed by boot.scr
+* initrd.img     - the initramfs, executed by boot.scr
+EOM
+    cat <<EOM >> "${B}/config.txt"
 
-echo                            >> ${B}/config.txt
-echo "disable_overscan=1"       >> ${B}/config.txt
-echo "dtoverlay=vc4-fkms-v3d"   >> ${B}/config.txt
-echo "gpu_mem=128"              >> ${B}/config.txt
-echo "hdmi_drive=2"             >> ${B}/config.txt
+# Enable the FKMS ("Fake" KMS) graphics overlay, enable the camera firmware
+# and allocate 128Mb to the GPU memory
+dtoverlay=vc4-fkms-v3d
+gpu_mem=128
+start_x=1
+
+# Comment out the following line if the edges of the desktop appear outside
+# the edges of your display
+disable_overscan=1
+
+# If you have issues with audio, you may try uncommenting the following line
+# which forces the HDMI output into HDMI mode instead of DVI (which doesn't
+# support audio output)
+#hdmi_drive=2
+
+# If you have a CM4, uncomment the following line to enable the USB2 outputs
+# on the IO board (assuming your CM4 is plugged into such a board)
+#dtoverlay=dwc2,dr_mode=host
+EOM
+    sed -i 's/enable_uart=1/enable_uart=0/' "${B}/config.txt"
+    sed -i 's/enable_uart=1/enable_uart=0/' "${B}/syscfg.txt"
+else
+    cat <<EOM > "${B}/README"
+An overview of the files on the /boot/firmware partition (the 1st partition
+on the SD card) used by the Ubuntu boot process (roughly in order) is as
+follows:
+
+* bootcode.bin   - this is the second stage bootloader loaded by all pis with
+                   the exception of the pi4 (where this is replaced by flash
+                   memory)
+* config.txt     - the configuration file read by the boot process
+* start*.elf     - the third stage bootloader, which handles device-tree
+                   modification and which loads...
+* vmlinuz        - the Linux kernel
+* cmdline.txt    - the Linux kernel command line
+* initrd.img     - the initramfs
+EOM
+
+    if [ "${IMG_ARCH}"  == "arm64" ]; then
+        cat <<EOM > "${B}/config.txt"
+[pi4]
+max_framebuffers=2
+
+[all]
+arm_64bit=1
+kernel=vmlinuz
+cmdline=cmdline.txt
+initramfs initrd.img followkernel
+
+# Enable the audio output, I2C and SPI interfaces on the GPIO header
+dtparam=audio=on
+dtparam=i2c_arm=on
+dtparam=spi=on
+
+# Enable the FKMS ("Fake" KMS) graphics overlay, enable the camera firmware
+# and allocate 128Mb to the GPU memory
+dtoverlay=vc4-fkms-v3d
+gpu_mem=128
+start_x=1
+
+# Comment out the following line if the edges of the desktop appear outside
+# the edges of your display
+disable_overscan=1
+
+# If you have issues with audio, you may try uncommenting the following line
+# which forces the HDMI output into HDMI mode instead of DVI (which doesn't
+# support audio output)
+#hdmi_drive=2
+
+# If you have a CM4, uncomment the following line to enable the USB2 outputs
+# on the IO board (assuming your CM4 is plugged into such a board)
+#dtoverlay=dwc2,dr_mode=host
+EOM
+    else
+        cat <<EOM > "${B}/config.txt"
+[pi4]
+max_framebuffers=2
+
+[all]
+kernel=vmlinuz
+cmdline=cmdline.txt
+initramfs initrd.img followkernel
+
+# Enable the audio output, I2C and SPI interfaces on the GPIO header
+dtparam=audio=on
+dtparam=i2c_arm=on
+dtparam=spi=on
+
+# Enable the FKMS ("Fake" KMS) graphics overlay, enable the camera firmware
+# and allocate 128Mb to the GPU memory
+dtoverlay=vc4-fkms-v3d
+gpu_mem=128
+start_x=1
+
+# Comment out the following line if the edges of the desktop appear outside
+# the edges of your display
+disable_overscan=1
+
+# If you have issues with audio, you may try uncommenting the following line
+# which forces the HDMI output into HDMI mode instead of DVI (which doesn't
+# support audio output)
+#hdmi_drive=2
+
+# If you have a CM4, uncomment the following line to enable the USB2 outputs
+# on the IO board (assuming your CM4 is plugged into such a board)
+#dtoverlay=dwc2,dr_mode=host
+EOM
+    fi
+fi
+
 
 echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
 
