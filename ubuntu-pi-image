@@ -113,7 +113,7 @@ function stage_02_apt() {
     fi
     nspawn apt -y update
     nspawn apt -y dist-upgrade
-    nspawn apt -y install ${DESKTOP_PACKAGES}^
+    nspawn apt -y install ubuntu-mate-desktop^
     nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 \
     libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
 
