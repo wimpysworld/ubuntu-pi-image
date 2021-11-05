@@ -542,22 +542,18 @@ REL_VER=$(echo ${IMG_VER} | cut -d'.' -f1-2)
 IMG_ARCH=$(echo "${IMG}" | cut -d'+' -f1 | cut -d'-' -f5)
 IMG_OUT=$(echo "${IMG}" | sed "s/ubuntu-/${FLAVOUR}-/" | sed 's/preinstalled-server-/desktop-/' | sed "s/${IMG_VER}/${IMG_VER}${IMG_QUALITY}/")
 IMG_TEST=$(file -b "${IMG}" | cut -d';' -f1)
-B_STAGE_0="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_0"
-R_STAGE_0="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_0"
-B_STAGE_1="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_1"
-R_STAGE_1="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_1"
-B_STAGE_2="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_2"
-R_STAGE_2="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_2"
-B_STAGE_3="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_3"
-R_STAGE_3="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_3"
-B_STAGE_4="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_4"
-R_STAGE_4="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_4"
-B_STAGE_5="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_5"
-R_STAGE_5="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_5"
-LOOP_DIR="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/loop"
-for STAGE in ${B_STAGE_0} ${R_STAGE_0} ${B_STAGE_1} ${R_STAGE_1} ${B_STAGE_2} ${R_STAGE_2} ${B_STAGE_3} ${R_STAGE_3} ${B_STAGE_4} ${R_STAGE_4} ${B_STAGE_5} ${R_STAGE_5} ${LOOP_DIR}; do
-    mkdir -p "${STAGE}" 2>/dev/null
+
+# Create stage caches
+for LOOP in 0 1 2 3 4 5; do
+    export B_STAGE_${LOOP}="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_${LOOP}"
+    export R_STAGE_${LOOP}="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_${LOOP}"
+    mkdir -p "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/boot_${LOOP}" 2>/dev/null
+    mkdir -p "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/root_${LOOP}" 2>/dev/null
 done
+
+# Create the mount point for loopback devices
+LOOP_DIR="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/loop"
+mkdir -p "${LOOP_DIR}" 2>/dev/null
 
 if [ "${IMG_TEST}" == "DOS/MBR boot sector" ]; then
     stage_00_tools
