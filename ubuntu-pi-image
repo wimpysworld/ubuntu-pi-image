@@ -117,19 +117,10 @@ function stage_02_apt() {
     nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 \
     libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
 
-    # wget "https://addons.mozilla.org/firefox/downloads/file/3398929/h264ify-1.1.0.xpi" -O "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/h264ify.xpi"
-    # mkdir "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/moz"
-    # cd "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/moz"
-    # bsdtar -xf "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/h264ify.xpi"
-    # sed -i 's/\[ "storage" \]/\[ "storage" \],     \
-    #   "browser_specific_settings": {               \
-    #     "gecko": {                                 \
-    #       "id": "jid1-TSgSxBhncsPBWQ@jetpack"      \
-    #     }                                          \
-    #   }/' manifest.json
-    #   bsdtar -caf h264ify.zip *
-    # install -Dm644 h264ify.zip "${R}/usr/share/mozilla/extensions/{ec8030f7-c20a-464f-9b0e-13a3a9e97384}/jid1-TSgSxBhncsPBWQ@jetpack.xpi"
-    # rm -rf "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/moz"
+    # linux-modules-extra-raspi was introduce in 21.10 (Impish)
+    case ${REL_VER} in
+        21.10) nspawn apt -y install linux-modules-extra-raspi;;
+    esac
 }
 
 function stage_03_snap() {
@@ -393,6 +384,10 @@ function stage_05_clean() {
         echo "No old kernel to remove."
     else
         nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
+        # linux-modules-extra-raspi was introduce in 21.10 (Impish)
+        case ${REL_VER} in
+            21.10) nspawn apt -y remove linux-modules-extra-${OLD_KERNEL};;
+        esac
     fi
 
     # Copy new devicetree, overlays and kernel to /boot/firmware
