@@ -102,11 +102,11 @@ function stage_02_apt() {
     sync_from "${B_STAGE_1}" "${R_STAGE_1}"
 
     # Remove most of the server components
-    nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu \
-    cloud-init cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl \
-    eatmydata ethtool finalrd git htop landscape-common lvm2 \
-    lxd-agent-loader mdadm multipath-tools open-iscsi openssh-server \
-    openssh-sftp-server overlayroot screen sosreport tmux vim xfsprogs
+    nspawn apt -y purge --autoremove bcache-tools btrfs-progs byobu cloud-init \
+    cloud-initramfs-copymods cloud-initramfs-dyn-netconf curl eatmydata ethtool \
+    finalrd git htop landscape-common lvm2 lxd-agent-loader mdadm \
+    multipath-tools open-iscsi openssh-server openssh-sftp-server overlayroot \
+    screen sosreport tmux vim xfsprogs
 
     if [ "${REL_VER}" == "20.04" ]; then
         nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
@@ -114,7 +114,8 @@ function stage_02_apt() {
     nspawn apt -y update
     nspawn apt -y dist-upgrade
     nspawn apt -y install ${DESKTOP_PACKAGES}^
-    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
+    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 \
+    libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
 
     # wget "https://addons.mozilla.org/firefox/downloads/file/3398929/h264ify-1.1.0.xpi" -O "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/h264ify.xpi"
     # mkdir "${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/moz"
