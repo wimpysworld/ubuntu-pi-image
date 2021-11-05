@@ -43,7 +43,7 @@ function nspawn() {
       --bind=${B}:/boot/firmware \
       --hostname="${FLAVOUR}" \
       --machine="${IMG_ARCH}-${FLAVOUR}-${REL_VER}" \
-      --directory "${R}" "$@"
+      --directory "${R}" "${@}"
 }
 
 function stage_00_tools() {
