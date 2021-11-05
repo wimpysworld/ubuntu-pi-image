@@ -5,12 +5,8 @@ LC_ALL=C
 function usage () {
   echo
   echo "Usage"
-  echo "  $0 --flavour <ubuntu flavour> --img ubuntu-20.04.1-preinstalled-server-arm64+raspi.img"
+  echo "  $0 --img ubuntu-20.04.1-preinstalled-server-arm64+raspi.img"
   echo
-  echo "Available Ubuntu flavours are"
-  echo "  ubuntu"
-  echo "  ubuntu-mate"
-  echo "  ubuntu-mate-minimal"
 }
 
 function sync_from() {
@@ -158,34 +154,27 @@ function stage_03_snap() {
     snap known --remote account-key public-key-sha3-384="${ACCOUNT_KEY}" > ${R}/var/lib/snapd/seed/assertions/account-key
 
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core20
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
-    if [ "${FLAVOUR}" == "ubuntu" ]; then
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} gnome-3-34-1804
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} gtk-common-themes
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} snap-store
-        nspawn snap prepare-image \
-            --arch="${IMG_ARCH}" \
-            --classic \
-            --snap=core18 \
-            --snap=snapd \
-            --snap=gnome-3-34-1804=${SEED_CHANNEL} \
-            --snap=gtk-common-themes=${SEED_CHANNEL} \
-            --snap=snap-store=${SEED_CHANNEL} \
-            /var/lib/snapd/seed/assertions/model /
-    elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} ubuntu-mate-welcome
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps software-boutique
-        nspawn snap download --target-directory=/var/lib/snapd/seed/snaps ubuntu-mate-pi
-        nspawn snap prepare-image \
-            --arch="${IMG_ARCH}" \
-            --classic \
-            --snap=core18 \
-            --snap=snapd \
-            --snap=ubuntu-mate-welcome=${SEED_CHANNEL} \
-            --snap=software-boutique \
-            --snap=ubuntu-mate-pi \
-            /var/lib/snapd/seed/assertions/model /
-    fi
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} ubuntu-mate-welcome
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps software-boutique
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps ubuntu-mate-pi
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} gtk-theme-yaru-mate
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel=${SEED_CHANNEL} icon-theme-yaru-mate
+
+    nspawn snap prepare-image \
+        --arch="${IMG_ARCH}" \
+        --classic \
+        --snap=core18 \
+        --snap=core20 \
+        --snap=snapd \
+        --snap=gtk-theme-yaru-mate=${SEED_CHANNEL} \
+        --snap=icon-theme-yaru-mate=${SEED_CHANNEL} \
+        --snap=ubuntu-mate-welcome=${SEED_CHANNEL} \
+        --snap=software-boutique \
+        --snap=ubuntu-mate-pi \
+        /var/lib/snapd/seed/assertions/model /
+
     mv ${R}/var/lib/snapd/seed/snaps/*.assert ${R}/var/lib/snapd/seed/assertions/
     rm -f ${R}/var/lib/snapd/seed/assertions/*.account
     rm -f ${R}/var/lib/snapd/seed/assertions/*.account-key
@@ -357,17 +346,11 @@ PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
 nspawn addgroup --gid 29999 oem
 nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
 nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
-nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork
-
-if [ "${FLAVOUR}" == "ubuntu" ]; then
-    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu
-elif [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
-    nspawn apt-get -y install --no-install-recommends oem-config-slideshow-ubuntu-mate
-    # Force the slideshow to use Ubuntu MATE artwork.
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-fi
+nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork oem-config-slideshow-ubuntu-mate
+# Force the slideshow to use Ubuntu MATE artwork.
+sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
 
 # Create files/dirs Ubiquity requires
 mkdir -p "${R}/var/log/installer"
@@ -380,8 +363,7 @@ nspawn /usr/sbin/oem-config-prepare --quiet
 # Install seeded snaps during oem-setup
 nspawn ln -s /lib/systemd/system/snapd.seeded.service /etc/systemd/system/oem-config.target.wants/snapd.seeded.service
 
-if [ "${FLAVOUR}" == "ubuntu-mate" ] || [ "${FLAVOUR}" == "ubuntu-mate-minimal" ]; then
-    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
+cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
 [org.mate.interface]
 enable-animations=false
 
@@ -391,8 +373,8 @@ compositing-manager=false
 [org.mate.session.required-components]
 windowmanager='marco-no-composite'
 EOM
-    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
-fi
+
+nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 
 # Create Raspberry Pi specific groups.
 nspawn groupadd -f --system gpio
@@ -567,10 +549,6 @@ if [ $# -lt 1 ]; then
 else
     while [ $# -gt 0 ]; do
         case "${1}" in
-            -flavour|--flavour|-flavor|--flavor)
-                FLAVOUR="${2}"
-                shift
-                shift;;
             -img|--img)
                 IMG="${2}"
                 if [ ! -e "${IMG}" ]; then
@@ -587,30 +565,7 @@ else
     done
 fi
 
-# Set variables based on chosen desktop environment
-case "${FLAVOUR}" in
-    ubuntu)
-        echo "[+] Specified Ubuntu"
-        DESKTOP_PACKAGES="ubuntu-desktop"
-        shift;;
-    ubuntu-mate)
-        echo "[+] Specified Ubuntu MATE"
-        DESKTOP_PACKAGES="ubuntu-mate-desktop"
-        shift;;
-    ubuntu-mate-minimal)
-        echo "[+] Specified Ubuntu MATE (minimal)"
-        DESKTOP_PACKAGES="ubuntu-mate-core"
-        shift;;
-    *)
-        if [ -z "${FLAVOUR}" ]; then
-        echo "[!] ERROR: Please specifiy an Ubuntu flavour"
-        else
-        echo "[!] ERROR: ${FLAVOUR} is not a valid Ubuntu flavour"
-        fi
-        usage
-        exit 1;;
-esac
-
+FLAVOUR="ubuntu-mate"
 TMP_DIR="/var/cache/ubuntu-pi-image"
 IMG_DIR=$(pwd)
 IMG_QUALITY="-beta3"
