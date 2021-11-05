@@ -48,9 +48,8 @@ function nspawn() {
 
 function stage_00_tools() {
     # Required tools on the host
-    apt-get -y install binfmt-support debootstrap \
-    git qemu-user-static rsync systemd-container \
-    ubuntu-keyring whois xz-utils
+    apt-get -y install binfmt-support debootstrap git qemu-user-static rsync \
+    systemd-container ubuntu-keyring whois xz-utils
 }
 
 function stage_01_unpack() {
@@ -293,40 +292,39 @@ disable_overscan=1
 EOM
 fi
 
+    echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
 
-echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
-
-# Disable Wifi power saving to improve WiFi performance on the Pi
-cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
+    # Disable Wifi power saving to improve WiFi performance on the Pi
+    cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
 [connection]
 wifi.powersave = 2
 EOM
 
-local DATE=""
-DATE=$(date +%m%H%M%S)
-local PASSWD=""
-PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
-nspawn addgroup --gid 29999 oem
-nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
-nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
-nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork oem-config-slideshow-ubuntu-mate
-# Force the slideshow to use Ubuntu MATE artwork.
-sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+    local DATE=""
+    DATE=$(date +%m%H%M%S)
+    local PASSWD=""
+    PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
+    nspawn addgroup --gid 29999 oem
+    nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
+    nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
+    nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork oem-config-slideshow-ubuntu-mate
+    # Force the slideshow to use Ubuntu MATE artwork.
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
 
-# Create files/dirs Ubiquity requires
-mkdir -p "${R}/var/log/installer"
-touch "${R}/var/lib/oem-config/run"
-touch "${R}/var/log/installer/debug"
-touch "${R}/var/log/syslog"
-nspawn chown syslog:adm /var/log/syslog
-nspawn /usr/sbin/oem-config-prepare --quiet
+    # Create files/dirs Ubiquity requires
+    mkdir -p "${R}/var/log/installer"
+    touch "${R}/var/lib/oem-config/run"
+    touch "${R}/var/log/installer/debug"
+    touch "${R}/var/log/syslog"
+    nspawn chown syslog:adm /var/log/syslog
+    nspawn /usr/sbin/oem-config-prepare --quiet
 
-# Install seeded snaps during oem-setup
-nspawn ln -s /lib/systemd/system/snapd.seeded.service /etc/systemd/system/oem-config.target.wants/snapd.seeded.service
+    # Install seeded snaps during oem-setup
+    nspawn ln -s /lib/systemd/system/snapd.seeded.service /etc/systemd/system/oem-config.target.wants/snapd.seeded.service
 
-cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
+    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
 [org.mate.interface]
 enable-animations=false
 
@@ -337,15 +335,15 @@ compositing-manager=false
 windowmanager='marco-no-composite'
 EOM
 
-nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
+    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 
-# Create Raspberry Pi specific groups.
-nspawn groupadd -f --system gpio
-nspawn groupadd -f --system i2c
-nspawn groupadd -f --system input
-nspawn groupadd -f --system spi
+    # Create Raspberry Pi specific groups.
+    nspawn groupadd -f --system gpio
+    nspawn groupadd -f --system i2c
+    nspawn groupadd -f --system input
+    nspawn groupadd -f --system spi
 
-cat <<'EOM' > "${R}/usr/local/sbin/adduser.local"
+    cat <<'EOM' > "${R}/usr/local/sbin/adduser.local"
 #!/bin/sh
 # This script is executed as the final step when calling `adduser`
 # USAGE:
@@ -354,9 +352,9 @@ cat <<'EOM' > "${R}/usr/local/sbin/adduser.local"
 # Add user to the Raspberry Pi specific groups
 usermod -a -G adm,gpio,i2c,input,spi,video $1
 EOM
-chmod 755 "${R}/usr/local/sbin/adduser.local"
+    chmod 755 "${R}/usr/local/sbin/adduser.local"
 
-cat <<'EOM' > "${R}/etc/fstab"
+    cat <<'EOM' > "${R}/etc/fstab"
 LABEL=writable      /               ext4    defaults,noatime,x-systemd.growfs   0   0
 LABEL=system-boot   /boot/firmware  vfat    defaults                            0   1
 EOM
@@ -383,7 +381,7 @@ function stage_05_clean() {
     if [ "${OLD_KERNEL}" == "${NEW_KERNEL}" ]; then
         echo "No old kernel to remove."
     else
-        nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
+        nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT} 
         # linux-modules-extra-raspi was introduce in 21.10 (Impish)
         case ${REL_VER} in
             21.10) nspawn apt -y remove linux-modules-extra-${OLD_KERNEL};;
