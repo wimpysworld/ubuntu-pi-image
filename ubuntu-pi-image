@@ -39,8 +39,8 @@ function nspawn() {
     # Bind mount resolv.conf and the firmware, set the hostname and spawn
     systemd-nspawn \
       --resolv-conf=off \
-      --bind-ro=${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/resolv.conf:/etc/resolv.conf \
-      --bind=${B}:/boot/firmware \
+      --bind-ro="${TMP_DIR}/${IMG_ARCH}/${FLAVOUR}/${REL_VER}/resolv.conf":/etc/resolv.conf \
+      --bind="${B}":/boot/firmware \
       --hostname="${FLAVOUR}" \
       --machine="${IMG_ARCH}-${FLAVOUR}-${REL_VER}" \
       --directory "${R}" "${@}"
@@ -57,14 +57,14 @@ function stage_01_unpack() {
     export R="${R_STAGE_1}"
 
     # Capture the patition details.
-    BOOT_PARTITION=`fdisk -l "${IMG}" | grep "c W95 FAT32 (LBA)"`
-    ROOT_PARTITION=`fdisk -l "${IMG}" | grep "83 Linux"`
+    BOOT_PARTITION=$(fdisk -l "${IMG}" | grep "c W95 FAT32 (LBA)")
+    ROOT_PARTITION=$(fdisk -l "${IMG}" | grep "83 Linux")
     echo "${BOOT_PARTITION}"
     echo "${ROOT_PARTITION}"
 
     # Grab the starting sector of the partitions.
-    BOOT_START_SECTOR=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
-    ROOT_START_SECTOR=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}'`
+    BOOT_START_SECTOR=$(echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}')
+    ROOT_START_SECTOR=$(echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $2}')
     #echo "${BOOT_START_SECTOR}"
     #echo "${ROOT_START_SECTOR}"
 
@@ -74,8 +74,8 @@ function stage_01_unpack() {
     #echo "${BOOT_START_BYTE}"
     #echo "${ROOT_START_BYTE}"
 
-    BOOT_SECTOR_LENGTH=`echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
-    ROOT_SECTOR_LENGTH=`echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}'`
+    BOOT_SECTOR_LENGTH=$(echo "${BOOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}')
+    ROOT_SECTOR_LENGTH=$(echo "${ROOT_PARTITION}" | sed -e 's/\*//g' | awk '{print $4}')
 
     # Calculate the byte length of the partitions.
     ((BOOT_BYTE_LENGTH=${BOOT_SECTOR_LENGTH} * 512))
@@ -84,10 +84,8 @@ function stage_01_unpack() {
     #echo "${ROOT_BYTE_LENGTH}"
 
     # Mount the partitions to the mount points.
-    BOOT_MOUNT=$(mount -v -o offset=${BOOT_START_BYTE},sizelimit=${BOOT_BYTE_LENGTH} -t vfat "${IMG}" "${B_STAGE_0}")
-    ROOT_MOUNT=$(mount -v -o offset=${ROOT_START_BYTE},sizelimit=${ROOT_BYTE_LENGTH} -t ext4 "${IMG}" "${R_STAGE_0}")
-    BOOT_DEV=$(echo "${BOOT_MOUNT}" | cut -d' ' -f2)
-    ROOT_DEV=$(echo "${ROOT_MOUNT}" | cut -d' ' -f2)
+    mount -v -o offset=${BOOT_START_BYTE},sizelimit=${BOOT_BYTE_LENGTH} -t vfat "${IMG}" "${B_STAGE_0}"
+    mount -v -o offset=${ROOT_START_BYTE},sizelimit=${ROOT_BYTE_LENGTH} -t ext4 "${IMG}" "${R_STAGE_0}"
     sync_from "${B_STAGE_0}" "${R_STAGE_0}"
     umount -l "${B_STAGE_0}"
     umount -l "${R_STAGE_0}"
@@ -309,9 +307,9 @@ EOM
     nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
     nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork oem-config-slideshow-ubuntu-mate
     # Force the slideshow to use Ubuntu MATE artwork.
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/lib/ubiquity/plugins/ubi-usersetup.py
-    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
-    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' $R/usr/sbin/oem-config-remove-gtk
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' ${R}/usr/lib/ubiquity/plugins/ubi-usersetup.py
+    sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' ${R}/usr/sbin/oem-config-remove-gtk
+    sed -i 's/ubiquity-slideshow-ubuntu/ubiquity-slideshow-ubuntu-mate/' ${R}/usr/sbin/oem-config-remove-gtk
 
     # Create files/dirs Ubiquity requires
     mkdir -p "${R}/var/log/installer"
