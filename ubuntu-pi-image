@@ -108,6 +108,7 @@ function stage_02_apt() {
     if [ "${REL_VER}" == "20.04" ]; then
         nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
     fi
+
     nspawn apt -y update
     nspawn apt -y dist-upgrade
     nspawn apt -y install cloud-guest-utils cloud-initramfs-growroot \
@@ -302,8 +303,10 @@ EOM
     local PASSWD=""
     PASSWD=$(mkpasswd -m sha-512 oem "${DATE}")
     nspawn addgroup --gid 29999 oem
+
     nspawn adduser --gecos "OEM Configuration (temporary user)" --add_extra_groups --disabled-password --gid 29999 --uid 29999 oem
     nspawn usermod -a -G adm,sudo -p "${PASSWD}" oem
+
     nspawn apt-get -y install --no-install-recommends oem-config-gtk ubiquity-frontend-gtk ubiquity-ubuntu-artwork oem-config-slideshow-ubuntu-mate
     # Force the slideshow to use Ubuntu MATE artwork.
     sed -i 's/oem-config-slideshow-ubuntu/oem-config-slideshow-ubuntu-mate/' ${R}/usr/lib/ubiquity/plugins/ubi-usersetup.py
@@ -378,7 +381,7 @@ function stage_05_clean() {
     if [ "${OLD_KERNEL}" == "${NEW_KERNEL}" ]; then
         echo "No old kernel to remove."
     else
-        nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT} 
+        nspawn apt -y remove linux-image-${OLD_KERNEL} linux-modules-${OLD_KERNEL} linux-raspi-headers-${OLD_KERNEL_SHORT}
         # linux-modules-extra-raspi was introduce in 21.10 (Impish)
         case ${REL_VER} in
             21.10) nspawn apt -y remove linux-modules-extra-${OLD_KERNEL};;
