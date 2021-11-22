@@ -110,14 +110,13 @@ function stage_02_apt() {
     fi
     nspawn apt -y update
     nspawn apt -y dist-upgrade
-    nspawn apt -y install ubuntu-mate-desktop^
-    nspawn apt -y install cloud-initramfs-growroot libgles1 libopengl0 \
-    libraspberrypi0 libraspberrypi-bin libxvmc1 pi-bluetooth rpi-eeprom
-
+    nspawn apt -y install cloud-guest-utils cloud-initramfs-growroot \
+    libraspberrypi0 libraspberrypi-bin pi-bluetooth raspi-config rpi-eeprom
     # linux-modules-extra-raspi was introduce in 21.10 (Impish)
     case ${REL_VER} in
         21.10) nspawn apt -y install linux-modules-extra-raspi;;
     esac
+    nspawn apt -y install ubuntu-mate-desktop^
 }
 
 function stage_03_snap() {
