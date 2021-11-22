@@ -550,8 +550,8 @@ fi
 FLAVOUR="ubuntu-mate"
 TMP_DIR="/var/cache/ubuntu-pi-image"
 IMG_DIR=$(pwd)
-IMG_QUALITY="-beta3"
 IMG_QUALITY=""
+IMG_QUALITY="-beta1"
 IMG_VER=$(echo "${IMG}" | cut -d'-' -f2)
 REL_VER=$(echo ${IMG_VER} | cut -d'.' -f1-2)
 IMG_ARCH=$(echo "${IMG}" | cut -d'+' -f1 | cut -d'-' -f5)
