@@ -128,6 +128,27 @@ function stage_02_desktop() {
     nspawn apt-get -y update
     nspawn apt-get -y install ubuntu-mate-core^
     nspawn apt-get -y install ubuntu-mate-desktop^
+
+    # Instruct netplan to hand all network management to NetworkManager
+    cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
+# Let NetworkManager manage all devices on this system
+network:
+  version: 2
+  renderer: NetworkManager
+EOM
+
+    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
+[org.mate.interface]
+enable-animations=false
+
+[org.mate.Marco.general]
+compositing-manager=false
+
+[org.mate.session.required-components]
+windowmanager='marco-no-composite'
+EOM
+
+    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 }
 
 function stage_03_snap() {
@@ -293,13 +314,6 @@ function stage_05_config() {
     export R="${R_STAGE_5}"
     sync_from "${B_STAGE_4}" "${R_STAGE_4}"
 
-# Instruct netplan to hand all network management to NetworkManager
-    cat <<EOM > "${R}/etc/netplan/01-network-manager-all.yaml"
-# Let NetworkManager manage all devices on this system
-network:
-  version: 2
-  renderer: NetworkManager
-EOM
     local DATE=""
     DATE=$(date +%m%H%M%S)
     local PASSWD=""
@@ -325,19 +339,6 @@ EOM
 
     # Install seeded snaps during oem-setup
     nspawn ln -s /lib/systemd/system/snapd.seeded.service /etc/systemd/system/oem-config.target.wants/snapd.seeded.service
-
-    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
-[org.mate.interface]
-enable-animations=false
-
-[org.mate.Marco.general]
-compositing-manager=false
-
-[org.mate.session.required-components]
-windowmanager='marco-no-composite'
-EOM
-
-    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 }
 
 function stage_06_clean() {
