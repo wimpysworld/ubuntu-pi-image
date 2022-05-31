@@ -103,10 +103,6 @@ EOM
     echo "${FLAVOUR}" > "${R}/etc/hostname"
     sed -i "1s|.*|127.0.0.1\tlocalhost ${FLAVOUR}|" "${R}/etc/hosts"
 
-    if [ "${IMG_VER}" == "20.04" ]; then
-        nspawn apt-add-repository --yes ppa:ubuntu-pi-flavour-makers/ppa
-    fi
-
     nspawn apt-get -y update
     nspawn apt-get -y upgrade
     nspawn apt-get -y dist-upgrade
@@ -116,6 +112,9 @@ EOM
 
     # Add standard Ubuntu userspace
     nspawn apt-get -y install standard^
+
+    # Add the Raspberry Pi specific tweaks
+    nspawn apt-get -y ubuntu-raspi-settings
 
     nspawn apt-get -y autoclean
     nspawn apt-get -y clean
@@ -144,26 +143,30 @@ function stage_03_snap() {
     snap known --remote account account-id=generic > "${R}/var/lib/snapd/seed/assertions/account"
     snap known --remote account-key public-key-sha3-384="${ACCOUNT_KEY}" > "${R}/var/lib/snapd/seed/assertions/account-key"
 
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core18
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps bare
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core20
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" ubuntu-mate-welcome
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps software-boutique
     nspawn snap download --target-directory=/var/lib/snapd/seed/snaps ubuntu-mate-pi
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" gtk-theme-yaru-mate
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" icon-theme-yaru-mate
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" snapd-desktop-integration
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" firefox
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" gnome-3-38-2004
+    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" gtk-common-themes
 
     nspawn snap prepare-image \
         --arch="${IMG_ARCH}" \
         --classic \
-        --snap=core18 \
+        --snap=bare \
         --snap=core20 \
         --snap=snapd \
-        --snap=gtk-theme-yaru-mate="${SEED_CHANNEL}" \
-        --snap=icon-theme-yaru-mate="${SEED_CHANNEL}" \
         --snap=ubuntu-mate-welcome="${SEED_CHANNEL}" \
         --snap=software-boutique \
         --snap=ubuntu-mate-pi \
+        --snap=snapd-desktop-integration="${SEED_CHANNEL}" \
+        --snap=firefox="${SEED_CHANNEL}" \
+        --snap=gnome-3-38-2004="${SEED_CHANNEL}" \
+        --snap=gtk-common-themes="${SEED_CHANNEL}" \
         /var/lib/snapd/seed/assertions/model /
 
     mv "${R}"/var/lib/snapd/seed/snaps/*.assert "${R}/var/lib/snapd/seed/assertions/"
@@ -178,55 +181,8 @@ function stage_04_kernel() {
     export R="${R_STAGE_4}"
     sync_from "${B_STAGE_3}" "${R_STAGE_3}"
 
-    if [ "${IMG_VER}"  == "20.04" ]; then
-        cat <<EOM > "${B}/README"
-An overview of the files on the /boot/firmware partition (the 1st partition
-on the SD card) used by the Ubuntu boot process (roughly in order) is as
-follows:
 
-* bootcode.bin   - this is the second stage bootloader loaded by all pis with
-                   the exception of the pi4 (where this is replaced by flash
-                   memory)
-* config.txt     - the first configuration file read by the boot process
-* syscfg.txt     - the file in which system modified configuration will be
-                   placed, included by config.txt
-* usercfg.txt    - the file in which user modified configuration should be
-                   placed, included by config.txt
-* start*.elf     - the third stage bootloader, which handles device-tree
-                   modification and which loads...
-* uboot*.bin     - various u-boot binaries for different pi platforms; these
-                   are launched as the "kernel" by config.txt
-* boot.scr       - the boot script executed by uboot*.bin which in turn
-                   loads...
-* vmlinuz        - the Linux kernel, executed by boot.scr
-* initrd.img     - the initramfs, executed by boot.scr
-EOM
-
-        cat <<EOM >> "${B}/config.txt"
-
-# Enable the FKMS ("Fake" KMS) graphics overlay, enable the camera firmware
-# and allocate 128Mb to the GPU memory
-dtoverlay=vc4-fkms-v3d
-gpu_mem=128
-start_x=1
-
-# Comment out the following line if the edges of the desktop appear outside
-# the edges of your display
-disable_overscan=1
-
-# If you have issues with audio, you may try uncommenting the following line
-# which forces the HDMI output into HDMI mode instead of DVI (which doesn't
-# support audio output)
-#hdmi_drive=2
-
-# If you have a CM4, uncomment the following line to enable the USB2 outputs
-# on the IO board (assuming your CM4 is plugged into such a board)
-#dtoverlay=dwc2,dr_mode=host
-EOM
-        sed -i 's/enable_uart=1/enable_uart=0/' "${B}/config.txt"
-        sed -i 's/enable_uart=1/enable_uart=0/' "${B}/syscfg.txt"
-    else
-        cat <<'EOM' > "${B}/README"
+    cat <<'EOM' > "${B}/README"
 An overview of the files on the /boot/firmware partition (the 1st partition
 on the SD card) used by the Ubuntu boot process (roughly in order) is as
 follows:
@@ -242,32 +198,31 @@ follows:
 * initrd.img     - the initramfs
 EOM
 
-        # No uboot since 20.10
-        if [ "${IMG_ARCH}"  == "arm64" ]; then
-            ARM64="arm_64bit=1"
-        else
-            ARM64=""
-        fi
+    if [ "${IMG_ARCH}"  == "arm64" ]; then
+        ARM64="# Config settings specific to arm64
+arm_64bit=1
+dtoverlay=dwc2"
+    else
+        ARM64=""
+    fi
 
-        cat <<EOM > "${B}/config.txt"
-[pi4]
-max_framebuffers=2
-
+    cat <<EOM > "${B}/config.txt"
 [all]
-${ARM64}
 kernel=vmlinuz
 cmdline=cmdline.txt
 initramfs initrd.img followkernel
 
-# Enable the audio output, I2C and SPI interfaces on the GPIO header
+[pi4]
+max_framebuffers=2
+arm_boost=1
+
+[all]
+# Enable the audio output, I2C and SPI interfaces on the GPIO header. As these
+# parameters related to the base device-tree they must appear *before* any
+# other dtoverlay= specification
 dtparam=audio=on
 dtparam=i2c_arm=on
 dtparam=spi=on
-
-# Enable the full KMS graphics overlay, as recommended by Ludo
-dtoverlay=vc4-fkms-v3d
-gpu_mem=128
-start_x=1
 
 # Comment out the following line if the edges of the desktop appear outside
 # the edges of your display
@@ -278,21 +233,36 @@ disable_overscan=1
 # support audio output)
 hdmi_drive=2
 
-# If you have a CM4, uncomment the following line to enable the USB2 outputs
-# on the IO board (assuming your CM4 is plugged into such a board)
-#dtoverlay=dwc2,dr_mode=host
+[cm4]
+# Enable the USB2 outputs on the IO board (assuming your CM4 is plugged into
+# such a board)
+dtoverlay=dwc2,dr_mode=host
+
+[all]
+
+# Enable the KMS ("full" KMS) graphics overlay, leaving GPU memory as the
+# default (the kernel is in control of graphics memory with full KMS)
+dtoverlay=vc4-kms-v3d
+
+# Autoload overlays for any recognized cameras or displays that are attached
+# to the CSI/DSI ports. Please note this is for libcamera support, *not* for
+# the legacy camera stack
+camera_auto_detect=1
+display_auto_detect=1
+
+${ARM64}
 EOM
-    fi
 
-    echo "net.ifnames=0 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 elevator=deadline rootwait fixrtc consoleblank=0 vt.global_cursor_default=0 quiet splash" > "${B}/cmdline.txt"
+#     # Create swap
 
+    echo "zswap.enabled=1 zswap.zpool=z3fold zswap.compressor=lz4 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc quiet splash consoleblank=0 vt.global_cursor_default=0" > "${B}/cmdline.txt"
     cat <<'EOM' > "${R}/etc/fstab"
-LABEL=writable      /               ext4    defaults,noatime,x-systemd.growfs   0   0
-LABEL=system-boot   /boot/firmware  vfat    defaults                            0   1
+LABEL=writable     /               ext4  discard,noatime,x-systemd.growfs  0  1
+LABEL=system-boot  /boot/firmware  vfat  defaults                          0  1
 EOM
 
     nspawn apt-get -y install libraspberrypi0 libraspberrypi-bin \
-    linux-firmware-raspi2 linux-headers-raspi linux-image-raspi \
+    linux-firmware-raspi linux-headers-raspi linux-image-raspi \
     linux-modules-extra-raspi pi-bluetooth raspi-config rpi-eeprom
 
     local NEW_KERNEL=$(ls -1 "${R}"/boot/vmlinuz-* | tail -n1 | awk -F/ '{print $NF}' | cut -d'-' -f2-4)
@@ -303,7 +273,7 @@ EOM
     echo "Kernel: ${NEW_KERNEL}"
 
     # Copy firmware, devicetree, overlays and kernel to the boot file system
-    cp -v "${R}/lib/linux-firmware-raspi2/"* "${B}/"
+    cp -v "${R}/lib/linux-firmware-raspi/"* "${B}/"
     cp -av "${R}/lib/firmware/${NEW_KERNEL}/device-tree/"* "${B}/"
 
     # Move the arm64 device-tree
@@ -328,13 +298,6 @@ network:
   version: 2
   renderer: NetworkManager
 EOM
-
-    # Disable Wifi power saving to improve WiFi performance on the Pi
-    cat <<EOM > "${R}/etc/NetworkManager/conf.d/ZZraspi-wifi-powersave-off.conf"
-[connection]
-wifi.powersave = 2
-EOM
-
     local DATE=""
     DATE=$(date +%m%H%M%S)
     local PASSWD=""
@@ -373,23 +336,6 @@ windowmanager='marco-no-composite'
 EOM
 
     nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
-
-    # Create Raspberry Pi specific groups.
-    nspawn groupadd -f --system gpio
-    nspawn groupadd -f --system i2c
-    nspawn groupadd -f --system input
-    nspawn groupadd -f --system spi
-
-    cat <<'EOM' > "${R}/usr/local/sbin/adduser.local"
-#!/bin/sh
-# This script is executed as the final step when calling `adduser`
-# USAGE:
-#   adduser.local USER UID GID HOME
-
-# Add user to the Raspberry Pi specific groups
-usermod -a -G adm,gpio,i2c,input,spi,video $1
-EOM
-    chmod 755 "${R}/usr/local/sbin/adduser.local"
 }
 
 function stage_06_clean() {
@@ -516,20 +462,22 @@ function stage_08_hash() {
     fi
 }
 
-if [ "$(id -u)" -ne 0 ]; then
-    echo "ERROR! Root permissions required."
-    exit 1
+if [ -z "${SUDO_USER}" ]; then
+  echo "ERROR! You must use sudo to run this script: sudo ./$(basename ${0})"
+  exit 1
+else
+  SUDO_HOME=$(getent passwd "${SUDO_USER}" | cut -d: -f6)
 fi
 
 APT_CACHE_IP=$(ip route get 1.1.1.1 | head -n 1 | cut -d' ' -f 7)
 FLAVOUR="ubuntu-mate"
 IMG_QUALITY=""
-IMG_QUALITY="-beta2"
-IMG_VER="21.10"
-IMG_RELEASE="impish"
+IMG_QUALITY="-beta1"
+IMG_VER="22.04"
+IMG_RELEASE="jammy"
 IMG_ARCH="arm64"
 IMG_OUT="${FLAVOUR}-${IMG_VER}${IMG_QUALITY}-desktop-${IMG_ARCH}+raspi.img"
-TMP_DIR="$(pwd)"
+TMP_DIR="${SUDO_HOME}/Builds"
 
 # Create caches
 for LOOP in 0 1 2 3 4 5 6 7 8 9; do
