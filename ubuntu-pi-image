@@ -135,6 +135,8 @@ function stage_03_snap() {
     export R="${R_STAGE_3}"
     sync_from "${B_STAGE_2}" "${R_STAGE_2}"
 
+    nspawn apt-get -y install xdelta3
+
     local SEED_CHANNEL="stable/ubuntu-${IMG_VER}"
 
     mkdir -p ${R}/var/lib/snapd/seed/{assertions,snaps}
