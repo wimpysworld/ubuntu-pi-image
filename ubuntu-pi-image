@@ -276,7 +276,6 @@ display_auto_detect=1
 ${ARM64}
 EOM
 
-#     # Create swap
     # Adds lz4 and z3fold modules to your initramfs.
     echo lz4    >> "${R}/etc/initramfs-tools/modules"
     echo z3fold >> "${R}/etc/initramfs-tools/modules"
