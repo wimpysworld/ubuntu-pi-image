@@ -40,7 +40,7 @@ function nspawn() {
     # Make sure the container has a machine-id
     systemd-machine-id-setup --root "${R}" --print
 
-    echo "RUNNING: ${@}"
+    echo "Running: ${@}"
     # Bind mount resolv.conf and the firmware, set the hostname and spawn
     systemd-nspawn \
       --resolv-conf=off \
@@ -106,7 +106,8 @@ function stage_01_bootstrap() {
     rm -rf "${R_STAGE_1}"/*
 
     # Required tools on the host
-    apt-get -y install binfmt-support debootstrap git qemu-user-static rsync \
+    apt-get -y install binfmt-support debootstrap device-tree-compiler git \
+    graphicsmagick-imagemagick-compat iproute2 qemu-user-static rsync \
     systemd-container ubuntu-keyring whois xz-utils
 
     # Bootstrap a minimal Ubuntu
@@ -384,6 +385,7 @@ function stage_05_config() {
     export R="${R_STAGE_5}"
     sync_from "${B_STAGE_4}" "${R_STAGE_4}"
 
+    # Create user and groups
     local DATE=""
     DATE=$(date +%m%H%M%S)
     local PASSWD=""
@@ -542,6 +544,7 @@ else
   SUDO_HOME=$(getent passwd "${SUDO_USER}" | cut -d: -f6)
 fi
 
+# Install apt-cacher-ng on the host and this script will use it.
 APT_CACHE_IP=$(ip route get 1.1.1.1 | head -n 1 | cut -d' ' -f 7)
 FLAVOUR="ubuntu-mate"
 IMG_QUALITY=""
