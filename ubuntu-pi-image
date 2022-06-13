@@ -54,6 +54,49 @@ function nspawn() {
     fi
 }
 
+function snap_preseed() {
+    local SNAP_NAME="${1}"
+    local SNAP_CHANNEL="${2}"
+    local SNAP_CONFINEMENT=""
+    local SNAP_FILE=""
+
+    # Download a snap only once
+    if ls -1 "${R}"/var/lib/snapd/seed/snaps/"${SNAP_NAME}"_*.snap >/dev/null 2>&1; then
+        return
+    fi
+
+    nspawn env SNAPPY_STORE_NO_CDN=1 UBUNTU_STORE_ARCH="${IMG_ARCH}" snap download --target-directory=/var/lib/snapd/seed "${SNAP_NAME}" --channel="${SNAP_CHANNEL}"
+    mv -v "${R}"/var/lib/snapd/seed/*.assert "${R}"/var/lib/snapd/seed/assertions/
+    mv -v "${R}"/var/lib/snapd/seed/*.snap "${R}"/var/lib/snapd/seed/snaps/
+    if [ "${SNAP_NAME}" == "snapd" ]; then
+        touch "${R}/var/lib/snapd/seed/.snapd-explicit-install-stamp"
+    fi
+
+    # Add the snap to the seed.yaml
+    if [ ! -e "${R}"/var/lib/snapd/seed/seed.yaml ]; then
+        echo "snaps:" > "${R}"/var/lib/snapd/seed/seed.yaml
+    fi
+
+    cat <<EOF >> "${R}"/var/lib/snapd/seed/seed.yaml
+  -
+    name: ${SNAP_NAME}
+    channel: ${SNAP_CHANNEL}
+EOF
+
+    # Process classic snaps
+    if [ -e "${R_STAGE_0}/${SNAP_NAME}.info" ]; then
+        SNAP_CONFINEMENT=$(grep confinement "${R_STAGE_0}/${SNAP_NAME}.info" | cut -d':' -f2 | sed 's/ //g')
+        echo "${SNAP_CONFINEMENT}"
+        case "${SNAP_CONFINEMENT}" in
+            classic) echo "    classic: true" >> "${R}"/var/lib/snapd/seed/seed.yaml;;
+        esac
+    fi
+
+    echo -n "    file: " >> "${R}"/var/lib/snapd/seed/seed.yaml
+    SNAP_FILE=$(ls -1 "${R}"/var/lib/snapd/seed/snaps/${SNAP_NAME}_*.snap)
+    basename "${SNAP_FILE}" >> "${R}"/var/lib/snapd/seed/seed.yaml
+}
+
 function stage_01_bootstrap() {
     local REPO=""
     export B="${B_STAGE_1}"
@@ -152,51 +195,71 @@ EOM
 }
 
 function stage_03_snap() {
+    local ACCOUNT_KEY=""
+    local BASE_SNAP=""
+    local SEED_SNAPS="ubuntu-mate-welcome software-boutique ubuntu-mate-pi snapd-desktop-integration gtk-common-themes gnome-3-38-2004 firefox"
+    local SNAP_CHANNEL=""
+    # https://git.launchpad.net/livecd-rootfs/tree/live-build/functions#n491
+    # https://discourse.ubuntu.com/t/seeding-a-classic-ubuntu-image/19756
+    # https://forum.snapcraft.io/t/broken-dependency-of-content-snaps-during-seeding/11566
+    # https://bugs.launchpad.net/ubuntu-image/+bug/1958275
+
     export B="${B_STAGE_3}"
     export R="${R_STAGE_3}"
     sync_from "${B_STAGE_2}" "${R_STAGE_2}"
 
     nspawn apt-get -y install xdelta3
 
-    local SEED_CHANNEL="stable/ubuntu-${IMG_VER}"
-
-    mkdir -p ${R}/var/lib/snapd/seed/{assertions,snaps}
+    # Prepare assertions
+    mkdir -p "${R}"/var/lib/snapd/seed/{assertions,snaps}
     snap known --remote model series=16 model=generic-classic brand-id=generic > "${R}/var/lib/snapd/seed/assertions/model"
-    local ACCOUNT_KEY=$(grep "^sign-key-sha3-384" "${R}/var/lib/snapd/seed/assertions/model" | cut -d':' -f2 | sed 's/ //g')
-    snap known --remote account account-id=generic > "${R}/var/lib/snapd/seed/assertions/account"
+    ACCOUNT_KEY=$(grep "^sign-key-sha3-384" "${R}/var/lib/snapd/seed/assertions/model" | cut -d':' -f2 | sed 's/ //g')
     snap known --remote account-key public-key-sha3-384="${ACCOUNT_KEY}" > "${R}/var/lib/snapd/seed/assertions/account-key"
+    snap known --remote account account-id=generic > "${R}/var/lib/snapd/seed/assertions/account"
 
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps bare
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps core20
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps snapd
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" ubuntu-mate-welcome
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps software-boutique
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps ubuntu-mate-pi
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" snapd-desktop-integration
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" firefox
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" gnome-3-38-2004
-    nspawn snap download --target-directory=/var/lib/snapd/seed/snaps --channel="${SEED_CHANNEL}" gtk-common-themes
+    # Download the snaps
+    for SNAP_NAME in ${SEED_SNAPS}; do
+        case "${SNAP_NAME}" in
+            software-boutique|ubuntu-mate-pi) SNAP_CHANNEL="stable";;
+            *) SNAP_CHANNEL="stable/ubuntu-${IMG_VER}";;
+        esac
 
-    nspawn snap prepare-image \
-        --arch="${IMG_ARCH}" \
-        --classic \
-        --snap=bare \
-        --snap=core20 \
-        --snap=snapd \
-        --snap=ubuntu-mate-welcome="${SEED_CHANNEL}" \
-        --snap=software-boutique \
-        --snap=ubuntu-mate-pi \
-        --snap=snapd-desktop-integration="${SEED_CHANNEL}" \
-        --snap=firefox="${SEED_CHANNEL}" \
-        --snap=gnome-3-38-2004="${SEED_CHANNEL}" \
-        --snap=gtk-common-themes="${SEED_CHANNEL}" \
-        /var/lib/snapd/seed/assertions/model /
+        snap_preseed "${SNAP_NAME}" "${SNAP_CHANNEL}"
 
-    mv "${R}"/var/lib/snapd/seed/snaps/*.assert "${R}/var/lib/snapd/seed/assertions/"
-    rm -f "${R}"/var/lib/snapd/seed/assertions/*.account
-    rm -f "${R}"/var/lib/snapd/seed/assertions/*.account-key
-    rm -f "${R}"/var/lib/snapd/seed/assertions/*.snap-declaration
-    rm -f "${R}"/var/lib/snapd/seed/assertions/*.snap-revision
+        # Download any required base snaps
+        if snap info --verbose "${R}"/var/lib/snapd/seed/snaps/"${SNAP_NAME}"*.snap > "${R_STAGE_0}/${SNAP_NAME}.info"; then
+            if grep -q '^base:' "${R_STAGE_0}/${SNAP_NAME}.info"; then
+                BASE_SNAP=$(awk '/^base:/ {print $2}' "${R_STAGE_0}/${SNAP_NAME}.info")
+                snap_preseed "${BASE_SNAP}" stable
+                case "${BASE_SNAP}" in
+                    core[0-9]*) snap_preseed snapd stable;;
+                esac
+            fi
+        fi
+    done
+
+    # Preseed the snaps
+    cat "${R}"/var/lib/snapd/seed/seed.yaml
+    snap debug validate-seed "${R}"/var/lib/snapd/seed/seed.yaml
+
+    # snap-preseed operates from outside the image being prepared and
+    # requires some mounts to be setup
+    mount --rbind /dev "${R}/dev"
+    mount proc-live -t proc "${R}/proc"
+    mount sysfs-live -t sysfs "${R}/sys"
+    mount securityfs -t securityfs "${R}/sys/kernel/security"
+
+    /usr/lib/snapd/snap-preseed --reset "${R}"
+    /usr/lib/snapd/snap-preseed "${R}"
+
+    for MOUNT in "${R}/sys/kernel/security" "${R}/sys" "${R}/proc" "${R}/dev"; do
+        echo "unmounting: ${MOUNT}"
+        mount --make-private "${MOUNT}"
+        umount -l "${MOUNT}"
+        udevadm settle
+        sleep 5
+    done
+    nspawn apparmor_parser --skip-read-cache --write-cache --skip-kernel-load --verbose  -j $(nproc) /etc/apparmor.d
 }
 
 function stage_04_kernel() {
