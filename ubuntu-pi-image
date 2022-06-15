@@ -187,6 +187,7 @@ function stage_03_snap() {
     local BASE_SNAP=""
     local SEED_SNAPS="ubuntu-mate-welcome software-boutique ubuntu-mate-pi snapd-desktop-integration gtk-common-themes gnome-3-38-2004 firefox"
     local SNAP_CHANNEL=""
+    local SNAP_PRESEED_FAILED=0
     # https://git.launchpad.net/livecd-rootfs/tree/live-build/functions#n491
     # https://discourse.ubuntu.com/t/seeding-a-classic-ubuntu-image/19756
     # https://forum.snapcraft.io/t/broken-dependency-of-content-snaps-during-seeding/11566
@@ -248,7 +249,9 @@ function stage_03_snap() {
     mount securityfs -t securityfs "${R}/sys/kernel/security"
 
     /usr/lib/snapd/snap-preseed --reset "${R}"
-    /usr/lib/snapd/snap-preseed "${R}"
+    if ! /usr/lib/snapd/snap-preseed "${R}"; then
+        SNAP_PRESEED_FAILED=1
+    fi
 
     for MOUNT in "${R}/sys/kernel/security" "${R}/sys" "${R}/proc" "${R}/dev"; do
         echo "unmounting: ${MOUNT}"
@@ -257,6 +260,12 @@ function stage_03_snap() {
         udevadm settle
         sleep 5
     done
+
+    if [ "${SNAP_PRESEED_FAILED}" -eq 1 ]; then
+        echo "ERROR! snap-preseed failed."
+        exit 1
+    fi
+
     nspawn apparmor_parser --skip-read-cache --write-cache --skip-kernel-load --verbose  -j $(nproc) /etc/apparmor.d
 }
 
