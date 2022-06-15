@@ -180,19 +180,6 @@ network:
   version: 2
   renderer: NetworkManager
 EOM
-
-    cat <<EOM > "${R}/usr/share/glib-2.0/schemas/50_ubuntu-mate-raspi-tweaks.gschema.override"
-[org.mate.interface]
-enable-animations=false
-
-[org.mate.Marco.general]
-compositing-manager=false
-
-[org.mate.session.required-components]
-windowmanager='marco-no-composite'
-EOM
-
-    nspawn glib-compile-schemas /usr/share/glib-2.0/schemas/
 }
 
 function stage_03_snap() {
