@@ -204,8 +204,7 @@ dtoverlay=dwc2
 
 ## Swap
 
-This is how Ubuntu creates `/swapfile`, but my testing shows that swap is not
-working for Ubuntu proper for the Raspberry Pi. Documenting here for reference:
+This is how Ubuntu creates `/swapfile`. Documenting here for reference:
 
 ```bash
      # Create swap

@@ -332,19 +332,46 @@ display_auto_detect=1
 ${ARM64}
 EOM
 
-    # Adds lz4 and z3fold modules to your initramfs.
+    # Adds lz4 and z3fold modules to initramfs.
+    # - - https://ubuntu.com/blog/how-low-can-you-go-running-ubuntu-desktop-on-a-2gb-raspberry-pi-4
     echo lz4    >> "${R}/etc/initramfs-tools/modules"
     echo z3fold >> "${R}/etc/initramfs-tools/modules"
 
-    fallocate -l 1GiB "${R}/swapfile"
-    chmod 600 "${R}/swapfile"
-    mkswap "${R}/swapfile"
+    # Swap
+    mkdir -p "${R}/usr/lib/systemd/system/swap.target.wants/"
+    cat <<'EOM' > "${R}/usr/lib/systemd/system/mkswap.service"
+[Unit]
+Description=Create the default swapfile
+DefaultDependencies=no
+Requires=local-fs.target
+After=local-fs.target
+Before=swapfile.swap
+ConditionPathExists=!/swapfile
+
+[Service]
+Type=oneshot
+ExecStartPre=fallocate -l 1GiB /swapfile
+ExecStartPre=chmod 600 /swapfile
+ExecStart=mkswap /swapfile
+
+[Install]
+WantedBy=swap.target
+EOM
+    nspawn ln -s /usr/lib/systemd/system/mkswap.service /usr/lib/systemd/system/swap.target.wants/mkswap.service
+
+    cat <<'EOM' > "${R}/usr/lib/systemd/system/swapfile.swap"
+[Unit]
+Description=The default swapfile
+
+[Swap]
+What=/swapfile
+EOM
+    nspawn ln -s /usr/lib/systemd/system/swapfile.swap /usr/lib/systemd/system/swap.target.wants/swapfile.swap
 
     echo "zswap.enabled=1 zswap.zpool=z3fold zswap.compressor=lz4 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc quiet splash consoleblank=0 vt.global_cursor_default=0" > "${B}/cmdline.txt"
     cat <<'EOM' > "${R}/etc/fstab"
 LABEL=writable     /               ext4  discard,noatime,x-systemd.growfs  0  1
 LABEL=system-boot  /boot/firmware  vfat  defaults                          0  1
-/swapfile          none            swap  sw                                0  0
 EOM
 
     nspawn apt-get -y install libraspberrypi0 libraspberrypi-bin \
