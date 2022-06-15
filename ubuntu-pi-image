@@ -437,7 +437,7 @@ function stage_07_image() {
     # Build the image file
     local SIZE_IMG=""
     SIZE_IMG=$(du -csh "${R}" | tail -n1 | cut -d'.' -f1)
-    ((SIZE_IMG+=2))
+    ((SIZE_IMG+=3))
     local SIZE_BOOT="256MiB"
 
     # Remove old images.
