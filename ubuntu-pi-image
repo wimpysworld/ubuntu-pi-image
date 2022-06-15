@@ -213,7 +213,7 @@ function stage_03_snap() {
         fi
 
         case "${SNAP_NAME}" in
-            software-boutique|ubuntu-mate-pi) SNAP_CHANNEL="stable";;
+            ubuntu-mate-pi) SNAP_CHANNEL="stable";;
             *) SNAP_CHANNEL="stable/ubuntu-${IMG_VER}";;
         esac
 
