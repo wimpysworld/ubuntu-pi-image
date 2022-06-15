@@ -261,7 +261,7 @@ function stage_03_snap() {
         sleep 5
     done
 
-    if [ "${SNAP_PRESEED_FAILED}" -eq 1 ]; then
+    if [ ${SNAP_PRESEED_FAILED} -eq 1 ]; then
         echo "ERROR! snap-preseed failed."
         exit 1
     fi
