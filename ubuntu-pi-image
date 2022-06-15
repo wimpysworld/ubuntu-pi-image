@@ -213,7 +213,7 @@ function stage_03_snap() {
         fi
 
         case "${SNAP_NAME}" in
-            ubuntu-mate-pi) SNAP_CHANNEL="stable";;
+            software-boutique|ubuntu-mate-pi) SNAP_CHANNEL="stable";;
             *) SNAP_CHANNEL="stable/ubuntu-${IMG_VER}";;
         esac
 
@@ -231,10 +231,15 @@ function stage_03_snap() {
         fi
     done
 
-    # Preseed the snaps
-    cat "${R}"/var/lib/snapd/seed/seed.yaml
-    snap debug validate-seed "${R}"/var/lib/snapd/seed/seed.yaml
+    # Validate seed.yaml
+    if snap debug validate-seed "${R}"/var/lib/snapd/seed/seed.yaml; then
+        cat "${R}"/var/lib/snapd/seed/seed.yaml
+    else
+        echo "ERROR! seed.yaml validation failed."
+        exit 1
+    fi
 
+    # Preseed the snaps
     # snap-preseed operates from outside the image being prepared and
     # requires some mounts to be setup
     mount --rbind /dev "${R}/dev"
