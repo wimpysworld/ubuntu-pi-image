@@ -88,7 +88,7 @@ EOF
         SNAP_CONFINEMENT=$(grep confinement "${R_STAGE_0}/${SNAP_NAME}.info" | cut -d':' -f2 | sed 's/ //g')
         echo "${SNAP_CONFINEMENT}"
         case "${SNAP_CONFINEMENT}" in
-            classic) echo "    classic: true" >> "${R}"/var/lib/snapd/seed/seed.yaml;;
+            *classic*) echo "    classic: true" >> "${R}"/var/lib/snapd/seed/seed.yaml;;
         esac
     fi
 
