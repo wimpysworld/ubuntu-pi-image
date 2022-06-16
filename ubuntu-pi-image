@@ -158,7 +158,7 @@ EOM
     nspawn apt-get -y install standard^
 
     # Add the Raspberry Pi specific tweaks
-    nspawn apt-get -y ubuntu-raspi-settings
+    nspawn apt-get -y install ubuntu-raspi-settings
 
     nspawn apt-get -y autoclean
     nspawn apt-get -y clean
