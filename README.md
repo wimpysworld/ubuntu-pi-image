@@ -48,7 +48,9 @@ Raspberry Pi.
 sudo ./ubuntu-pi-image
 ```
 
-The script will create `~/Build` is your home directory that will include
+The script will create `~/Build` in your home directory that will include the
+caches for each stages and the image for putting on your Raspberry Pi SD card,
+USB stick or SSD.
 
 ## Other Desktop
 
