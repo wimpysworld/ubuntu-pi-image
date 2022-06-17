@@ -1,5 +1,61 @@
 # ubuntu-pi-image
-## Bootloader
+
+**If you just want to download Ubuntu MATE images for the Raspberry Pi the go to the Ubuntu MATE website:**
+
+  * **https://ubuntu-mate.org/raspberry-pi/**
+
+These "docs" are not comprehensive, but should be enough to get you started with
+building your own Ubuntu based images for the Raspberry Pi.
+
+
+## Building Images
+
+  * Clone the Retro Home project
+    * `git clone https://github.com/wimpysworld/ubuntu-pi-image.git`
+
+It is best to run the `ubuntu-pi-image` on an Ubuntu 22.04 x86 64-bit
+workstation, ideally running in a VM via [Quickemu](https://github.com/quickemu-project/quickemu).
+If using a fresh [Quickemu](https://github.com/quickemu-project/quickemu) VM
+you'll need to set the `disk_size` parameter large enough to complete the build.
+This can be achieved by adding `disk_size="64G"` to `ubuntu-mate-jammy.conf`
+before running `quickemu` to create the VM. Alternatively you could mount
+external storage into the container for the build area. You'll also need at
+least to `sudo apt install git`.
+
+## apt-cacher-ng
+
+If you `apt-get install apt-cache-ng` the `ubuntu-pi-image` script will
+automatically use the apt-cache-ng proxy to accelerate build performance.
+
+## Build configuration
+
+You can tweak some variables towards the bottom of the `ubuntu-pi-image` script.
+
+```bash
+FLAVOUR="ubuntu-mate"
+IMG_QUALITY="-beta1"
+IMG_VER="22.04"
+IMG_RELEASE="jammy"
+IMG_ARCH="arm64"
+```
+
+### Usage
+
+The following incantation will build a Ubuntu MATE 22.04 arm64 image for
+Raspberry Pi.
+
+```bash
+sudo ./ubuntu-pi-image
+```
+
+The script will create `~/Build` is your home directory that will include
+
+## Other Desktop
+
+Modify the `stage_02_desktop` and `stage_03_snap` accordingly to adapt the script
+for other Ubuntu flavours/desktops.
+
+## Bootloaders
 
 This is the bootloader configuration from Ubuntu 22.04.
 
@@ -200,43 +256,4 @@ display_auto_detect=1
 # Config settings specific to arm64
 arm_64bit=1
 dtoverlay=dwc2
-```
-
-## Swap
-
-This is how Ubuntu creates `/swapfile`. Documenting here for reference:
-
-```bash
-     # Create swap
-     cat <<'EOM' > "${R}/usr/lib/systemd/system/swapfile.swap"
-[Unit]
-Description=The default swapfile
-
-[Swap]
-What=/swapfile
-EOM
-
-    mkdir -p "${R}/usr/lib/systemd/system/swap.target.wants/"
-    nspawn ln -s /usr/lib/systemd/system/swapfile.swap /usr/lib/systemd/system/swap.target.wants/swapfile.swap
-
-    # Enable swap
-    cat <<'EOM' > "${R}/usr/lib/systemd/system/mkswap.service"
-[Unit]
-Description=Create the default swapfile
-DefaultDependencies=no
-Requires=local-fs.target
-After=local-fs.target
-Before=swapfile.swap
-ConditionPathExists=!/swapfile
-
-[Service]
-Type=oneshot
-ExecStartPre=fallocate -l 1GiB /swapfile
-ExecStartPre=chmod 600 /swapfile
-ExecStart=mkswap /swapfile
-
-[Install]
-WantedBy=swap.target
-EOM
-    nspawn ln -s /usr/lib/systemd/system/mkswap.service /usr/lib/systemd/system/swap.target.wants/mkswap.service
 ```
