@@ -358,11 +358,12 @@ ${ARM64}
 EOM
 
     # Adds lz4 and z3fold modules to initramfs.
-    # - - https://ubuntu.com/blog/how-low-can-you-go-running-ubuntu-desktop-on-a-2gb-raspberry-pi-4
+    # - https://ubuntu.com/blog/how-low-can-you-go-running-ubuntu-desktop-on-a-2gb-raspberry-pi-4
     echo lz4    >> "${R}/etc/initramfs-tools/modules"
     echo z3fold >> "${R}/etc/initramfs-tools/modules"
 
     # Swap
+    # - https://git.launchpad.net/livecd-rootfs/tree/live-build/ubuntu/hooks/099-ubuntu-image-customization.chroot
     mkdir -p "${R}/usr/lib/systemd/system/swap.target.wants/"
     cat <<'EOM' > "${R}/usr/lib/systemd/system/mkswap.service"
 [Unit]
