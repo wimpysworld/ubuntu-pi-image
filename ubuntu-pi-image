@@ -143,6 +143,10 @@ deb http://ports.ubuntu.com/ ${IMG_RELEASE}-backports main restricted universe m
 deb-src http://ports.ubuntu.com/ ${IMG_RELEASE}-backports main restricted universe multiverse
 EOM
 
+    # Set locale to C.UTF-8 by default.
+    # https://git.launchpad.net/livecd-rootfs/tree/live-build/auto/build#n159
+    echo "LANG=C.UTF-8" > "${R}/etc/default/locale"
+
     nspawn hostnamectl --static set-hostname "${FLAVOUR}"
     echo "${FLAVOUR}" > "${R}/etc/hostname"
     sed -i "1s|.*|127.0.0.1\tlocalhost ${FLAVOUR}|" "${R}/etc/hosts"
