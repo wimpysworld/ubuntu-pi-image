@@ -241,39 +241,46 @@ function stage_03_snap() {
     fi
 
     # Preseed the snaps
+    #  - NOTE! This is how livecd-rootfs runs snap-preeseed, but it fails on
+    #  - armhh and the snap preseeding does complete during oem-setup.
+    #  - Disabled for now.
     # snap-preseed operates from outside the image being prepared and
     # requires some mounts to be setup
-    mount --rbind /dev "${R}/dev"
-    mount proc-live -t proc "${R}/proc"
-    mount sysfs-live -t sysfs "${R}/sys"
-    mount securityfs -t securityfs "${R}/sys/kernel/security"
+    if false; then
+        mount --rbind /dev "${R}/dev"
+        mount proc-live -t proc "${R}/proc"
+        mount sysfs-live -t sysfs "${R}/sys"
+        mount securityfs -t securityfs "${R}/sys/kernel/security"
 
-    /usr/lib/snapd/snap-preseed --reset "${R}"
-    if ! /usr/lib/snapd/snap-preseed "${R}"; then
-        SNAP_PRESEED_FAILED=1
+        /usr/lib/snapd/snap-preseed --reset "${R}"
+
+        if [ "${IMG_ARCH}" != "armhf" ]; then
+            if ! /usr/lib/snapd/snap-preseed "${R}"; then
+                SNAP_PRESEED_FAILED=1
+            fi
+        fi
+
+        for MOUNT in "${R}/sys/kernel/security" "${R}/sys" "${R}/proc" "${R}/dev"; do
+            echo "unmounting: ${MOUNT}"
+            mount --make-private "${MOUNT}"
+            umount -l "${MOUNT}"
+            udevadm settle
+            sleep 5
+        done
+
+        if [ ${SNAP_PRESEED_FAILED} -eq 1 ]; then
+            echo "ERROR! snap-preseed failed."
+            exit 1
+        fi
+
+        nspawn apparmor_parser --skip-read-cache --write-cache --skip-kernel-load --verbose  -j $(nproc) /etc/apparmor.d
     fi
-
-    for MOUNT in "${R}/sys/kernel/security" "${R}/sys" "${R}/proc" "${R}/dev"; do
-        echo "unmounting: ${MOUNT}"
-        mount --make-private "${MOUNT}"
-        umount -l "${MOUNT}"
-        udevadm settle
-        sleep 5
-    done
-
-    if [ ${SNAP_PRESEED_FAILED} -eq 1 ]; then
-        echo "ERROR! snap-preseed failed."
-        exit 1
-    fi
-
-    nspawn apparmor_parser --skip-read-cache --write-cache --skip-kernel-load --verbose  -j $(nproc) /etc/apparmor.d
 }
 
 function stage_04_kernel() {
     export B="${B_STAGE_4}"
     export R="${R_STAGE_4}"
     sync_from "${B_STAGE_3}" "${R_STAGE_3}"
-
 
     cat <<'EOM' > "${B}/README"
 An overview of the files on the /boot/firmware partition (the 1st partition
