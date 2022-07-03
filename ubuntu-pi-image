@@ -156,16 +156,14 @@ EOM
     nspawn apt-get -y dist-upgrade
 
     # Install first boot filesystem expansion
-    nspawn apt-get -y install cloud-initramfs-growroot
+    nspawn apt-get -y install --no-install-recommends cloud-guest-utils \
+    cloud-initramfs-growroot
 
     # Add standard Ubuntu userspace
     nspawn apt-get -y install standard^
 
     # Add the Raspberry Pi specific tweaks
     nspawn apt-get -y install ubuntu-raspi-settings
-
-    nspawn apt-get -y autoclean
-    nspawn apt-get -y clean
 }
 
 function stage_02_desktop() {
@@ -173,7 +171,6 @@ function stage_02_desktop() {
     export R="${R_STAGE_2}"
     sync_from "${B_STAGE_1}" "${R_STAGE_1}"
 
-    nspawn apt-get -y update
     nspawn apt-get -y install ubuntu-mate-core^
     nspawn apt-get -y install ubuntu-mate-desktop^
 
