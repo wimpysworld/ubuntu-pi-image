@@ -354,6 +354,46 @@ display_auto_detect=1
 ${ARM64}
 EOM
 
+    echo "zswap.enabled=1 zswap.zpool=z3fold zswap.compressor=lz4 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc quiet splash" > "${B}/cmdline.txt"
+    cat <<'EOM' > "${R}/etc/fstab"
+LABEL=writable     /               ext4  discard,noatime,x-systemd.growfs  0  1
+LABEL=system-boot  /boot/firmware  vfat  defaults                          0  1
+EOM
+
+    nspawn apt-get -y install libraspberrypi0 libraspberrypi-bin \
+    linux-firmware-raspi linux-image-raspi linux-modules-extra-raspi \
+    pi-bluetooth rpi-eeprom
+
+    # Prevent triggerhappy from being installed
+    nspawn apt-get -y install --no-install-recommends raspi-config
+    nspawn systemctl disable raspi-config
+
+    local NEW_KERNEL=$(ls -1 "${R}"/boot/vmlinuz-* | tail -n1 | awk -F/ '{print $NF}' | cut -d'-' -f2-4)
+    if [ -z "${NEW_KERNEL}" ]; then
+        echo "ERROR! Could not detect the new kernel version"
+        exit 1
+    fi
+    echo "Kernel: ${NEW_KERNEL}"
+
+    # Copy firmware, devicetree, overlays and kernel to the boot file system
+    cp -v "${R}/lib/linux-firmware-raspi/"* "${B}/"
+    cp -av "${R}/lib/firmware/${NEW_KERNEL}/device-tree/"* "${B}/"
+
+    # Move the arm64 device-tree
+    if [ -d "${B}/broadcom" ]; then
+        mv -v "${B}/broadcom/"*.dtb "${B}"/
+        rm -rf "${B}/broadcom"
+    fi
+
+    cp -av "${R}/boot/vmlinuz-${NEW_KERNEL}" "${B}/vmlinuz"
+    cp -av "${R}/boot/initrd.img-${NEW_KERNEL}" "${B}/initrd.img"
+}
+
+function stage_05_config() {
+    export B="${B_STAGE_5}"
+    export R="${R_STAGE_5}"
+    sync_from "${B_STAGE_4}" "${R_STAGE_4}"
+
     # Adds lz4 and z3fold modules to initramfs.
     # - https://ubuntu.com/blog/how-low-can-you-go-running-ubuntu-desktop-on-a-2gb-raspberry-pi-4
     echo lz4    >> "${R}/etc/initramfs-tools/modules"
@@ -391,41 +431,21 @@ What=/swapfile
 EOM
     nspawn ln -s /usr/lib/systemd/system/swapfile.swap /usr/lib/systemd/system/swap.target.wants/swapfile.swap
 
-    echo "zswap.enabled=1 zswap.zpool=z3fold zswap.compressor=lz4 dwc_otg.lpm_enable=0 console=tty1 root=LABEL=writable rootfstype=ext4 rootwait fixrtc quiet splash consoleblank=0 vt.global_cursor_default=0" > "${B}/cmdline.txt"
-    cat <<'EOM' > "${R}/etc/fstab"
-LABEL=writable     /               ext4  discard,noatime,x-systemd.growfs  0  1
-LABEL=system-boot  /boot/firmware  vfat  defaults                          0  1
+    cat <<'EOM' > "${R}/usr/lib/systemd/system/fontconfig-regenerate-cache.service"
+[Unit]
+Description=Make sure the font cache is generated
+After=local-fs.target
+DefaultDependencies=no
+ConditionPathExists=!/var/cache/fontconfig/CACHEDIR.TAG
+
+[Service]
+Type=simple
+ExecStart=fc-cache -frsv
+
+[Install]
+WantedBy=sysinit.target
 EOM
-
-    nspawn apt-get -y install libraspberrypi0 libraspberrypi-bin \
-    linux-firmware-raspi linux-headers-raspi linux-image-raspi \
-    linux-modules-extra-raspi pi-bluetooth raspi-config rpi-eeprom
-
-    local NEW_KERNEL=$(ls -1 "${R}"/boot/vmlinuz-* | tail -n1 | awk -F/ '{print $NF}' | cut -d'-' -f2-4)
-    if [ -z "${NEW_KERNEL}" ]; then
-        echo "ERROR! Could not detect the new kernel version"
-        exit 1
-    fi
-    echo "Kernel: ${NEW_KERNEL}"
-
-    # Copy firmware, devicetree, overlays and kernel to the boot file system
-    cp -v "${R}/lib/linux-firmware-raspi/"* "${B}/"
-    cp -av "${R}/lib/firmware/${NEW_KERNEL}/device-tree/"* "${B}/"
-
-    # Move the arm64 device-tree
-    if [ -d "${B}/broadcom" ]; then
-        mv -v "${B}/broadcom/"*.dtb "${B}"/
-        rm -rf "${B}/broadcom"
-    fi
-
-    cp -av "${R}/boot/vmlinuz-${NEW_KERNEL}" "${B}/vmlinuz"
-    cp -av "${R}/boot/initrd.img-${NEW_KERNEL}" "${B}/initrd.img"
-}
-
-function stage_05_config() {
-    export B="${B_STAGE_5}"
-    export R="${R_STAGE_5}"
-    sync_from "${B_STAGE_4}" "${R_STAGE_4}"
+    nspawn systemctl enable fontconfig-regenerate-cache.service
 
     # Create user and groups
     local DATE=""
@@ -478,7 +498,7 @@ function stage_06_clean() {
     rm -f "${R}"/var/log/bootstrap.log
     rm -f "${R}"/var/log/dpkg.log
     rm -f "${R}"/var/log/fontconfig.log
-    rm -rf "${R}"/tmp/*
+    rm -f "${R}"/var/cache/fontconfig/CACHEDIR.TAG
     rm -f "${R}"/var/crash/*
     rm -rf "${R}"/var/lib/apt/lists/*
     rm -f "${R}"/var/lib/dpkg/*-old
