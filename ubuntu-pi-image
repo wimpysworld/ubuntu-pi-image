@@ -465,20 +465,21 @@ function stage_06_clean() {
     nspawn apt-get -y clean
 
     rm -f "${B}"/{*.bak,*.old}
+    rm -f "${R}"/wget-log
     rm -f "${R}"/boot/{*.bak,*.old}
     rm -f "${R}"/etc/ssh/ssh_host_*_key*
     rm -f "${R}"/etc/apt/*.save
     rm -f "${R}"/etc/apt/apt.conf.d/90cache
     rm -f "${R}"/etc/apt/sources.list.d/*.save
+    rm -f "${R}"/root/.wget-hsts
+    rm -rf "${R}"/tmp/*
     rm -f "${R}"/var/log/apt/*
     rm -f "${R}"/var/log/alternatives.log
+    rm -f "${R}"/var/log/bootstrap.log
     rm -f "${R}"/var/log/dpkg.log
     rm -f "${R}"/var/log/fontconfig.log
     rm -rf "${R}"/tmp/*
     rm -f "${R}"/var/crash/*
-    rm -f "${R}"/var/cache/apt/*
-    rm -rf "${R}"/var/cache/apt/archives/*
-    rm -f "${R}"/var/cache/debconf/*-old
     rm -rf "${R}"/var/lib/apt/lists/*
     rm -f "${R}"/var/lib/dpkg/*-old
     [ -L "${R}"/var/lib/dbus/machine-id ] || rm -f "${R}"/var/lib/dbus/machine-id
