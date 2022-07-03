@@ -209,15 +209,15 @@ function stage_03_snap() {
 
     # Download the snaps
     for SNAP_NAME in ${SEED_SNAPS}; do
-        # snapd-desktop-integration is not available for armhf, so skip it
+        # snapd-desktop-integration is not available in stable for armhf yet
         if [ "${IMG_ARCH}" == "armhf" ] && [ "${SNAP_NAME}" == "snapd-desktop-integration" ]; then
-            continue
+            SNAP_CHANNEL="candidate"
+        else
+            case "${SNAP_NAME}" in
+                software-boutique|ubuntu-mate-pi) SNAP_CHANNEL="stable";;
+                *) SNAP_CHANNEL="stable/ubuntu-${IMG_VER}";;
+            esac
         fi
-
-        case "${SNAP_NAME}" in
-            software-boutique|ubuntu-mate-pi) SNAP_CHANNEL="stable";;
-            *) SNAP_CHANNEL="stable/ubuntu-${IMG_VER}";;
-        esac
 
         snap_preseed "${SNAP_NAME}" "${SNAP_CHANNEL}"
 
