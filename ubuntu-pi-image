@@ -611,8 +611,7 @@ fi
 # Install apt-cacher-ng on the host and this script will use it.
 APT_CACHE_IP=$(ip route get 1.1.1.1 | head -n 1 | cut -d' ' -f 7)
 FLAVOUR="ubuntu-mate"
-IMG_QUALITY=""
-IMG_QUALITY="-beta1"
+IMG_QUALITY="" # Or something like "-beta1" for testing images
 IMG_VER="22.04"
 IMG_RELEASE="jammy"
 IMG_ARCH="arm64"
